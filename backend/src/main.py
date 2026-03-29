@@ -73,6 +73,9 @@ load_all_models()
 class URLRequest(BaseModel):
     url: str
 
+@app.get("/")
+async def root():
+    return {"status": "online", "message": "Phishing Guardian AI API is running!"}
 @app.post("/predict")
 async def predict(request: URLRequest):
     url = request.url.strip()
