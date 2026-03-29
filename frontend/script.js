@@ -6,7 +6,7 @@
 // 1. CẤU HÌNH HỆ THỐNG
 // Thay đổi URL này khi bạn deploy Backend lên các dịch vụ như Render/Railway
 const API_CONFIG = {
-    BASE_URL: "http://127.0.0.1:8000",
+    BASE_URL: "https://phishing-guardian-api.onrender.com",
     ENDPOINTS: {
         PREDICT: "/predict"
     }
