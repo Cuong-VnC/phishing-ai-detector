@@ -1,6 +1,5 @@
 fastapi==0.104.1
 uvicorn==0.24.0
-# TensorFlow 2.16.1 đã bao gồm sẵn Keras 3
 tensorflow-cpu==2.16.1
 xgboost==2.0.2
 pandas==2.0.3
@@ -11,3 +10,4 @@ python-dotenv==1.0.0
 supabase==2.3.0
 requests-file==1.5.1
 requests==2.31.0
+python-Levenshtein==0.23.0
