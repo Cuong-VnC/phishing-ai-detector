@@ -153,3 +153,64 @@ function updateTechnicalField(id, value, suffix = "") {
         }
     }
 }
+
+
+lucide.createIcons();
+
+async function analyzeURL() {
+    const urlInput = document.getElementById('urlInput');
+    const url = urlInput.value.trim();
+    if(!url) return;
+
+    // Hiện Popup quét vân tay
+    const popup = document.getElementById('scanPopup');
+    popup.style.display = 'flex';
+
+    // Reset giao diện
+    document.getElementById('initial-view').style.display = 'none';
+    document.getElementById('result-area').style.display = 'none';
+
+    try {
+        const response = await fetch("https://phishing-guardian-api.onrender.com/predict", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: url })
+        });
+        const data = await response.json();
+        
+        // Ẩn popup và hiện kết quả sau 1.5s
+        setTimeout(() => {
+            popup.style.display = 'none';
+            displayResult(data);
+        }, 1500);
+    } catch (e) {
+        popup.style.display = 'none';
+        alert("Lỗi: Không thể kết nối tới SOC AI Core.");
+    }
+}
+
+function displayResult(data) {
+    const area = document.getElementById('result-area');
+    area.style.display = 'block';
+    
+    const prob = (data.probability * 100).toFixed(1);
+    const isPhishing = data.status === "Phishing";
+    
+    document.getElementById('probabilityText').innerText = prob + "%";
+    const fill = document.getElementById('probFill');
+    fill.style.width = prob + "%";
+    fill.style.backgroundColor = isPhishing ? "var(--danger)" : "var(--success)";
+    
+    const verdictText = document.getElementById('verdictText');
+    verdictText.innerText = isPhishing ? "CẢNH BÁO: PHÁT HIỆN LỪA ĐẢO" : "AN TOÀN: LIÊN KẾT HỢP LỆ";
+    verdictText.style.color = isPhishing ? "var(--danger)" : "var(--success)";
+    
+    if(data.technical_report) {
+        document.getElementById('resAge').innerText = data.technical_report.domain_age + " ngày";
+        document.getElementById('resDNS').innerText = data.technical_report.dns_status;
+        document.getElementById('resImpersonation').innerText = data.technical_report.impersonation_risk;
+        document.getElementById('resShortened').innerText = data.technical_report.is_shortened ? "CÓ" : "KHÔNG";
+    }
+    lucide.createIcons();
+    area.scrollIntoView({ behavior: 'smooth' });
+}
