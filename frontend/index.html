@@ -3,245 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phishing Guardian AI | Hệ thống cảnh báo lừa đảo</title>
+    <title>Phishing Guardian | Bảo mật thông minh</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <style>
-        :root {
-            --bg-dark: #0f172a;
-            --card-bg: #1e293b;
-            --primary: #38bdf8;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --success: #10b981;
-            --text-main: #f8fafc;
-            --text-dim: #94a3b8;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            display: flex;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 2rem;
-        }
-
-        .container { width: 100%; max-width: 900px; }
-
-        /* Header */
-        header { text-align: center; margin-bottom: 3rem; }
-        header h1 { font-size: 2.5rem; letter-spacing: -1px; margin-bottom: 0.5rem; color: var(--primary); }
-        header p { color: var(--text-dim); }
-
-        /* Input Section */
-        .search-box {
-            background: var(--card-bg);
-            padding: 1.5rem;
-            border-radius: 1rem;
-            display: flex;
-            gap: 1rem;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-            border: 1px solid #334155;
-            margin-bottom: 2rem;
-        }
-        input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            outline: none;
-            color: white;
-            font-size: 1.1rem;
-        }
-        button {
-            background: var(--primary);
-            color: var(--bg-dark);
-            border: none;
-            padding: 0.8rem 2rem;
-            border-radius: 0.5rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        button:hover { filter: brightness(1.1); transform: translateY(-2px); }
-
-        /* Loading Animation */
-        #loading { display: none; text-align: center; margin: 2rem 0; }
-        .radar {
-            width: 60px; height: 60px; border-radius: 50%;
-            border: 2px solid var(--primary);
-            margin: 0 auto 1rem;
-            position: relative;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(0.8); opacity: 0.5; }
-            50% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(0.8); opacity: 0.5; }
-        }
-
-        /* Result Cards */
-        #result-area { display: none; }
-        .main-verdict {
-            padding: 2rem;
-            border-radius: 1rem;
-            text-align: center;
-            margin-bottom: 2rem;
-            border: 2px solid transparent;
-        }
-        .verdict-phishing { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); color: var(--danger); }
-        .verdict-safe { background: rgba(16, 185, 129, 0.1); border-color: var(--success); color: var(--success); }
-        .verdict-suspicious { background: rgba(245, 158, 11, 0.1); border-color: var(--warning); color: var(--warning); }
-
-        /* Details Grid */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-        }
-        .card {
-            background: var(--card-bg);
-            padding: 1.5rem;
-            border-radius: 0.8rem;
-            border: 1px solid #334155;
-        }
-        .card-label { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
-        .card-value { font-size: 1.2rem; font-weight: 700; }
-
-        .tag {
-            display: inline-block;
-            padding: 0.2rem 0.6rem;
-            border-radius: 0.3rem;
-            font-size: 0.75rem;
-            margin-top: 0.5rem;
-        }
-        .tag-db { background: #6366f1; color: white; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="light-glow"></div>
 
-<div class="container">
-    <header>
-        <h1>PHISHING GUARDIAN AI</h1>
-        <p>Hệ thống phân tích URL dựa trên trí tuệ nhân tạo (XGBoost + LSTM)</p>
-    </header>
+    <div class="container">
+        <nav class="navbar">
+            <div class="logo">
+                <i data-lucide="shield-check"></i>
+                <span>Phishing<strong>Guardian</strong></span>
+            </div>
+            <div class="system-status">
+                <span class="dot"></span> Hệ thống đang bảo vệ
+            </div>
+        </nav>
 
-    <div class="search-box">
-        <i data-lucide="shield-search" style="color: var(--text-dim)"></i>
-        <input type="text" id="urlInput" placeholder="Nhập URL cần kiểm tra (vd: http://phishing-site.com)...">
-        <button onclick="analyzeURL()">
-            <span>QUÉT NGAY</span>
-            <i data-lucide="zap"></i>
-        </button>
-    </div>
+        <header class="hero">
+            <h1>Kiểm tra liên kết an toàn</h1>
+            <p>Hệ thống phân tích URL dựa trên trí tuệ nhân tạo (XGBoost + LSTM) và Databae 1M+ URL lừa đảo cập nhật liên tục để bảo vệ bạn khỏi các trang web lừa đảo và mã độc.</p>
+        </header>
 
-    <div id="loading">
-        <div class="radar"></div>
-        <p>Đang thực hiện phân tích chuyên sâu...</p>
-    </div>
+        <section class="search-section">
+            <div class="search-card">
+                <div class="input-group">
+                    <i data-lucide="link" class="icon-link"></i>
+                    <input type="text" id="urlInput" placeholder="Dán địa chỉ trang web vào đây để kiểm tra..." autocomplete="off">
+                </div>
+                <button onclick="analyzeURL()" id="scanBtn">
+                    <span>Kiểm tra ngay</span>
+                    <i data-lucide="arrow-right"></i>
+                </button>
+            </div>
+        </section>
 
-    <div id="result-area">
-        <div id="mainVerdict" class="main-verdict">
-            <h2 id="verdictText">ĐANG PHÂN TÍCH</h2>
-            <p id="probabilityText">Xác suất lừa đảo: 0%</p>
-            <div id="sourceTag" class="tag tag-db" style="display:none">DỮ LIỆU CÓ SẴN (CACHE)</div>
+        <div id="initial-view" class="features-grid">
+            <div class="feature-item">
+                <i data-lucide="brain-circuit"></i>
+                <h3>Phân tích AI</h3>
+                <p>Kết hợp mô hình XGBoost và LSTM để đạt độ chính xác cao.</p>
+            </div>
+            <div class="feature-item">
+                <i data-lucide="database"></i>
+                <h3>Dữ liệu lớn</h3>
+                <p>Kiểm tra chéo với hàng triệu tên miền lừa đảo đã biết.</p>
+            </div>
+            <div class="feature-item">
+                <i data-lucide="zap"></i>
+                <h3>Tốc độ cao</h3>
+                <p>Nhận kết quả phân tích chỉ trong chưa đầy 2 giây.</p>
+            </div>
         </div>
 
-        <div class="grid">
-            <div class="card">
-                <div class="card-label"><i data-lucide="calendar"></i> TUỔI DOMAIN</div>
-                <div class="card-value" id="resAge">N/A</div>
+        <div id="loading" class="loading-state" style="display:none">
+            <div class="spinner"></div>
+            <p>Đang quét các dấu hiệu nguy hiểm...</p>
+        </div>
+
+        <main id="result-area" class="result-container" style="display:none">
+            <div id="mainVerdict" class="verdict-main-card">
+                <div class="verdict-content">
+                    <div class="verdict-icon" id="verdictIcon">
+                        <i data-lucide="shield-check"></i>
+                    </div>
+                    <div class="verdict-info">
+                        <h2 id="verdictText">Kết quả phân tích</h2>
+                        <p id="probabilityDesc">Độ tin cậy của đánh giá này dựa trên các chỉ số kỹ thuật.</p>
+                    </div>
+                </div>
+                
+                <div class="risk-bar-container">
+                    <div class="risk-labels">
+                        <span>Mức độ rủi ro</span>
+                        <span id="probabilityText">0%</span>
+                    </div>
+                    <div class="bar-bg">
+                        <div id="probFill" class="bar-fill"></div>
+                    </div>
+                </div>
             </div>
-            <div class="card">
-                <div class="card-label"><i data-lucide="globe"></i> DNS STATUS</div>
-                <div class="card-value" id="resDNS">Unknown</div>
+
+            <div class="details-grid">
+                <div class="detail-card">
+                    <div class="detail-label">Tuổi tên miền</div>
+                    <div class="detail-value" id="resAge">N/A</div>
+                </div>
+                <div class="detail-card">
+                    <div class="detail-label">Trạng thái DNS</div>
+                    <div class="detail-value" id="resDNS">Unknown</div>
+                </div>
+                <div class="detail-card">
+                    <div class="detail-label">Rủi ro mạo danh</div>
+                    <div class="detail-value" id="resImpersonation">Thấp</div>
+                </div>
+                <div class="detail-card">
+                    <div class="detail-label">Link rút gọn</div>
+                    <div class="detail-value" id="resShortened">Không</div>
+                </div>
             </div>
-            <div class="card">
-                <div class="card-label"><i data-lucide="user-minus"></i> MẠO DANH</div>
-                <div class="card-value" id="resImpersonation">Low</div>
+            
+            <div class="action-footer">
+                <button class="btn-secondary" onclick="location.reload()">
+                    <i data-lucide="rotate-ccw"></i> Kiểm tra link khác
+                </button>
             </div>
-            <div class="card">
-                <div class="card-label"><i data-lucide="link-2"></i> RÚT GỌN</div>
-                <div class="card-value" id="resShortened">No</div>
-            </div>
+        </main>
+    </div>
+
+    <div id="scanPopup" class="scan-overlay" style="display: none;">
+    <div class="scan-modal-small">
+        <div class="qr-scanner-box">
+            <div class="scan-corner t-l"></div>
+            <div class="scan-corner t-r"></div>
+            <div class="scan-corner b-l"></div>
+            <div class="scan-corner b-r"></div>
+            <div class="laser-line"></div>
+            <i data-lucide="fingerprint" class="scan-icon-bg"></i>
+        </div>
+        <div class="scan-text">
+            <p class="status-msg">ĐANG PHÂN TÍCH AI...</p>
+            <span class="sub-msg">Vui lòng đợi trong giây lát</span>
         </div>
     </div>
 </div>
 
-<script>
-    // Khởi tạo icons
-    lucide.createIcons();
-
-    // Thay đổi link này sau khi bạn deploy Backend lên Render
-    const API_URL = "https://phishing-guardian-api.onrender.com/predict";
-
-    async function analyzeURL() {
-        const urlValue = document.getElementById('urlInput').value.trim();
-        if (!urlValue) return alert("Vui lòng nhập URL!");
-
-        // Reset UI
-        document.getElementById('loading').style.display = 'block';
-        document.getElementById('result-area').style.display = 'none';
-        document.getElementById('sourceTag').style.display = 'none';
-
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: urlValue })
-            });
-
-            if (!response.ok) throw new Error("API Error");
-
-            const data = await response.json();
-            displayResult(data);
-
-        } catch (error) {
-            console.error(error);
-            alert("Không thể kết nối tới Backend. Hãy đảm bảo bạn đã chạy main.py!");
-        } finally {
-            document.getElementById('loading').style.display = 'none';
-        }
-    }
-
-    function displayResult(data) {
-        const area = document.getElementById('result-area');
-        const verdictBox = document.getElementById('mainVerdict');
-        const verdictText = document.getElementById('verdictText');
-        const probText = document.getElementById('probabilityText');
-
-        area.style.display = 'block';
-        
-        // Hiển thị kết luận chính
-        verdictText.innerText = data.status === "Phishing" ? "🚨 CẢNH BÁO: URL ĐỘC HẠI" : "✅ URL CÓ VẺ AN TOÀN";
-        probText.innerText = `Xác suất lừa đảo: ${(data.probability * 100).toFixed(2)}%`;
-        
-        // Đổi màu box
-        verdictBox.className = "main-verdict " + (data.status === "Phishing" ? "verdict-phishing" : "verdict-safe");
-
-        // Hiển thị tag nếu lấy từ Database
-        if(data.source === "database_cache") {
-            document.getElementById('sourceTag').style.display = 'inline-block';
-        }
-
-        // Hiển thị Technical Report
-        if(data.technical_report) {
-            document.getElementById('resAge').innerText = data.technical_report.domain_age + " ngày";
-            document.getElementById('resDNS').innerText = data.technical_report.dns_status;
-            document.getElementById('resImpersonation').innerText = data.technical_report.impersonation_risk;
-            document.getElementById('resShortened').innerText = data.technical_report.is_shortened ? "Yes" : "No";
-        }
-
-        // Re-draw icons
-        lucide.createIcons();
-    }
-</script>
-
+    <script src="script.js"></script>
 </body>
 </html>
