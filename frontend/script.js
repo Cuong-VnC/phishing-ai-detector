@@ -1,10 +1,7 @@
 /**
  * PHISHING GUARDIAN AI - FRONTEND LOGIC
- * Chịu trách nhiệm gọi API, xử lý dữ liệu và cập nhật giao diện người dùng.
  */
 
-// 1. CẤU HÌNH HỆ THỐNG
-// Thay đổi URL này khi bạn deploy Backend lên các dịch vụ như Render/Railway
 const API_CONFIG = {
     BASE_URL: "https://phishing-guardian-api.onrender.com",
     ENDPOINTS: {
@@ -12,14 +9,11 @@ const API_CONFIG = {
     }
 };
 
-// 2. KHỞI TẠO KHI TRANG WEB LOAD XONG
 document.addEventListener('DOMContentLoaded', () => {
-    // Khởi tạo các icon Lucide ban đầu
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
 
-    // Hỗ trợ nhấn phím Enter để quét
     const urlInput = document.getElementById('urlInput');
     urlInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -28,164 +22,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-/**
- * Hàm chính thực hiện gọi API phân tích URL
- */
-async function analyzeURL() {
-    const urlInput = document.getElementById('urlInput');
-    const loadingArea = document.getElementById('loading');
-    const resultArea = document.getElementById('result-area');
-    const sourceTag = document.getElementById('sourceTag');
-    
-    const urlValue = urlInput.value.trim();
-
-    // Kiểm tra đầu vào hợp lệ cơ bản
-    if (!urlValue) {
-        alert("Vui lòng nhập một URL hợp lệ để bắt đầu phân tích!");
-        return;
-    }
-
-    // BƯỚC 1: TRẠNG THÁI CHỜ (UI RESET)
-    loadingArea.style.display = 'block';
-    resultArea.style.display = 'none';
-    sourceTag.style.display = 'none';
-    
-    // Cuộn xuống để người dùng thấy radar đang quét
-    loadingArea.scrollIntoView({ behavior: 'smooth' });
-
-    try {
-        // BƯỚC 2: GỌI API BACKEND
-        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PREDICT}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ url: urlValue })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || "Lỗi máy chủ Backend");
-        }
-
-        const data = await response.json();
-
-        // BƯỚC 3: HIỂN THỊ KẾT QUẢ
-        setTimeout(() => {
-            displayResult(data);
-            loadingArea.style.display = 'none';
-        }, 800); // Tạo độ trễ nhỏ để hiệu ứng radar trông thật hơn
-
-    } catch (error) {
-        console.error("Analysis Error:", error);
-        loadingArea.style.display = 'none';
-        alert(`❌ Không thể kết nối tới hệ thống AI: ${error.message}\n\nHãy đảm bảo bạn đã khởi động Backend (main.py) trên cổng 8000.`);
-    }
-}
-
-/**
- * Cập nhật dữ liệu trả về từ API lên các thành phần giao diện
- * @param {Object} data - Dữ liệu JSON từ API
- */
-function displayResult(data) {
-    const resultArea = document.getElementById('result-area');
-    const verdictBox = document.getElementById('mainVerdict');
-    const verdictText = document.getElementById('verdictText');
-    const probText = document.getElementById('probabilityText');
-    const sourceTag = document.getElementById('sourceTag');
-
-    // 1. Hiện khu vực kết quả
-    resultArea.style.display = 'block';
-
-    // 2. Phân loại màu sắc và nội dung theo Status
-    const isPhishing = data.status === "Phishing";
-    
-    verdictBox.className = "main-verdict " + (isPhishing ? "verdict-phishing" : "verdict-safe");
-    verdictText.innerText = isPhishing ? "🚨 CẢNH BÁO: URL ĐỘC HẠI" : "✅ URL CÓ VẺ AN TOÀN";
-    
-    // 3. Hiệu ứng thanh xác suất (Probability Bar)
-    const probPercentage = (data.probability * 100).toFixed(2);
-    probText.innerText = `Mức độ rủi ro: ${probPercentage}%`;
-    
-    // Tạo thanh tiến trình (nếu bạn có thêm HTML này trong CSS)
-    const probBar = document.querySelector('.probability-fill');
-    if (probBar) {
-        probBar.style.width = probPercentage + "%";
-        probBar.style.backgroundColor = isPhishing ? "var(--danger)" : "var(--success)";
-    }
-
-    // 4. Kiểm tra nguồn dữ liệu (AI hay Cache)
-    if (data.source === "database_cache") {
-        sourceTag.style.display = 'inline-block';
-        sourceTag.title = "Kết quả này được lấy ngay lập tức từ cơ sở dữ liệu tri thức.";
-    }
-
-    // 5. Cập nhật Technical Report (Thông tin mạng)
-    if (data.technical_report) {
-        updateTechnicalField('resAge', data.technical_report.domain_age, "ngày");
-        updateTechnicalField('resDNS', data.technical_report.dns_status);
-        updateTechnicalField('resImpersonation', data.technical_report.impersonation_risk);
-        updateTechnicalField('resShortened', data.technical_report.is_shortened ? "Có (Rủi ro)" : "Không");
-    }
-
-    // 6. Vẽ lại các icon Lucide mới (cho các tag động)
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
-
-    // Cuộn xuống kết quả
-    resultArea.scrollIntoView({ behavior: 'smooth' });
-}
-
-/**
- * Hàm bổ trợ để cập nhật giá trị vào các Card thông tin
- */
-function updateTechnicalField(id, value, suffix = "") {
-    const element = document.getElementById(id);
-    if (element) {
-        if (value === null || value === undefined || value === "Unknown" || value === "N/A") {
-            element.innerText = "Không rõ";
-            element.style.color = "var(--text-dim)";
-        } else {
-            element.innerText = `${value} ${suffix}`;
-            element.style.color = "var(--text-main)";
-        }
-    }
-}
-
-
-lucide.createIcons();
-
 async function analyzeURL() {
     const urlInput = document.getElementById('urlInput');
     const url = urlInput.value.trim();
-    if(!url) return;
+    
+    if (!url) {
+        alert("Vui lòng nhập một URL hợp lệ!");
+        return;
+    }
 
-    // Hiện Popup quét vân tay
+    // 1. Hiển thị Popup quét (Hiệu ứng radar/vân tay)
     const popup = document.getElementById('scanPopup');
-    popup.style.display = 'flex';
+    if (popup) popup.style.display = 'flex';
 
-    // Reset giao diện
+    // 2. Reset giao diện cũ
     document.getElementById('initial-view').style.display = 'none';
     document.getElementById('result-area').style.display = 'none';
+    document.getElementById('loading').style.display = 'none';
 
     try {
-        const response = await fetch("https://phishing-guardian-api.onrender.com/predict", {
+        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PREDICT}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: url })
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Lỗi máy chủ");
+        }
+
         const data = await response.json();
         
-        // Ẩn popup và hiện kết quả sau 1.5s
+        // Ẩn popup và hiển thị kết quả sau 1.2s để tạo hiệu ứng chuyên nghiệp
         setTimeout(() => {
-            popup.style.display = 'none';
+            if (popup) popup.style.display = 'none';
             displayResult(data);
-        }, 1500);
-    } catch (e) {
-        popup.style.display = 'none';
-        alert("Lỗi: Không thể kết nối tới SOC AI Core.");
+        }, 1200);
+
+    } catch (error) {
+        if (popup) popup.style.display = 'none';
+        console.error("Lỗi:", error);
+        alert(`❌ Không thể kết nối tới SOC AI Core: ${error.message}`);
     }
 }
 
@@ -193,24 +71,62 @@ function displayResult(data) {
     const area = document.getElementById('result-area');
     area.style.display = 'block';
     
+    // --- SỬA LỖI LOGIC TẠI ĐÂY ---
+    // Kiểm tra rủi ro dựa trên risk_level hoặc status chứa từ khóa Phishing/Malicious/Suspicious
+    const riskLevel = data.risk_level; // "High", "Medium", "Low"
+    const isDangerous = (riskLevel === "High" || riskLevel === "Medium");
     const prob = (data.probability * 100).toFixed(1);
-    const isPhishing = data.status === "Phishing";
     
-    document.getElementById('probabilityText').innerText = prob + "%";
+    // 1. Cập nhật thanh rủi ro
+    const probText = document.getElementById('probabilityText');
     const fill = document.getElementById('probFill');
+    
+    probText.innerText = prob + "%";
     fill.style.width = prob + "%";
-    fill.style.backgroundColor = isPhishing ? "var(--danger)" : "var(--success)";
     
+    // Đổi màu theo mức độ rủi ro
+    if (riskLevel === "High") {
+        fill.style.backgroundColor = "var(--danger)";
+    } else if (riskLevel === "Medium") {
+        fill.style.backgroundColor = "var(--warning)";
+    } else {
+        fill.style.backgroundColor = "var(--success)";
+    }
+    
+    // 2. Cập nhật tiêu đề thông báo
     const verdictText = document.getElementById('verdictText');
-    verdictText.innerText = isPhishing ? "CẢNH BÁO: PHÁT HIỆN LỪA ĐẢO" : "AN TOÀN: LIÊN KẾT HỢP LỆ";
-    verdictText.style.color = isPhishing ? "var(--danger)" : "var(--success)";
+    const verdictIcon = document.getElementById('verdictIcon');
     
-    if(data.technical_report) {
-        document.getElementById('resAge').innerText = data.technical_report.domain_age + " ngày";
-        document.getElementById('resDNS').innerText = data.technical_report.dns_status;
-        document.getElementById('resImpersonation').innerText = data.technical_report.impersonation_risk;
+    if (riskLevel === "High") {
+        verdictText.innerText = "🚨 CẢNH BÁO: URL ĐỘC HẠI";
+        verdictText.style.color = "var(--danger)";
+        if (verdictIcon) verdictIcon.style.color = "var(--danger)";
+    } else if (riskLevel === "Medium") {
+        verdictText.innerText = "⚠️ CHÚ Ý: LIÊN KẾT NGHI VẤN";
+        verdictText.style.color = "var(--warning)";
+        if (verdictIcon) verdictIcon.style.color = "var(--warning)";
+    } else {
+        verdictText.innerText = "✅ AN TOÀN: LIÊN KẾT HỢP LỆ";
+        verdictText.style.color = "var(--success)";
+        if (verdictIcon) verdictIcon.style.color = "var(--success)";
+    }
+    
+    // 3. Cập nhật báo cáo kỹ thuật
+    if (data.technical_report) {
+        document.getElementById('resAge').innerText = 
+            (data.technical_report.domain_age !== "N/A" ? data.technical_report.domain_age + " ngày" : "Không rõ");
+        document.getElementById('resDNS').innerText = data.technical_report.dns_status || "N/A";
+        document.getElementById('resImpersonation').innerText = data.technical_report.impersonation_risk || "Thấp";
         document.getElementById('resShortened').innerText = data.technical_report.is_shortened ? "CÓ" : "KHÔNG";
     }
-    lucide.createIcons();
+
+    // 4. Hiển thị nguồn dữ liệu (Source Tag)
+    console.log("Phân tích từ nguồn:", data.source);
+
+    // Re-render các icon Lucide cho giao diện mới
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+    
     area.scrollIntoView({ behavior: 'smooth' });
 }
