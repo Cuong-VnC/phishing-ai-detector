@@ -1,6 +1,6 @@
 import os
 import sys
-import types
+import json
 import pickle
 import numpy as np
 import xgboost as xgb
@@ -13,24 +13,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 
-# --- 🚀 CẤU HÌNH KERAS 3 & VÁ LỖI LEGACY ---
-os.environ["KERAS_BACKEND"] = "tensorflow" 
-
-try:
-    import keras
-    m = types.ModuleType('keras.src.legacy')
-    sys.modules['keras.src.legacy'] = m
-    sys.modules['keras.src.legacy.preprocessing'] = m
-    import keras.preprocessing.text as txt
-    import keras.preprocessing.sequence as seq
-    sys.modules['keras.src.legacy.preprocessing.text'] = txt
-    sys.modules['keras.src.legacy.preprocessing.sequence'] = seq
-    print("✅ Keras 3 đã sẵn sàng với bản vá Legacy")
-except Exception as e:
-    print(f"⚠️ Cảnh báo Keras: {e}")
+# --- CẤU HÌNH KERAS ---
+os.environ["KERAS_BACKEND"] = "tensorflow"
 
 from keras.models import load_model
-from keras.preprocessing.sequence import pad_sequences
 
 # Thiết lập đường dẫn
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -38,31 +24,62 @@ BACKEND_DIR = os.path.dirname(SRC_DIR)
 MODEL_DIR = os.path.join(BACKEND_DIR, "models")
 if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
 
-from features import extract_basic_features, get_advanced_insights
+from features import (extract_features, registrable_domain, get_advanced_insights,
+                      load_tokenizer_json, texts_to_char_sequences, pad_post, FEATURE_NAMES)
 from database import check_url_in_db
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Load Models
+# Load Models (pipeline notebook dataset_url_05: NN -> XGBoost stack)
+# 5 artifacts trong backend/models: phishing_nn.keras, xgb_model.json,
+# tokenizer.json, scaler.pkl, meta.json
+model_nn = None
 model_xgb = None
-model_lstm = None
-tokenizer = None
+tokenizer_index = None  # (word_index, oov_index)
+tokenizer_oov = None
+scaler = None
+META = {"threshold": 0.5, "max_len": 200, "trusted_domains": set(), "feature_names": FEATURE_NAMES}
+
 
 def load_all_models():
-    global model_xgb, model_lstm, tokenizer
+    global model_nn, model_xgb, tokenizer_index, tokenizer_oov, scaler, META
     try:
-        with open(os.path.join(MODEL_DIR, "tokenizer.pickle"), "rb") as f:
-            tokenizer = pickle.load(f)
+        with open(os.path.join(MODEL_DIR, "meta.json"), encoding="utf-8") as f:
+            meta = json.load(f)
+        META = {
+            "threshold": float(meta.get("threshold", 0.5)),
+            "max_len": int(meta.get("max_len", 200)),
+            "trusted_domains": set(meta.get("trusted_domains", [])),
+            "feature_names": meta.get("feature_names", FEATURE_NAMES),
+        }
+        if len(META["feature_names"]) != 18:
+            print(f"⚠️ Cảnh báo: meta.json có {len(META['feature_names'])} features, kỳ vọng 18")
+        tokenizer_index, tokenizer_oov = load_tokenizer_json(os.path.join(MODEL_DIR, "tokenizer.json"))
+        with open(os.path.join(MODEL_DIR, "scaler.pkl"), "rb") as f:
+            scaler = pickle.load(f)
         model_xgb = xgb.XGBClassifier()
-        model_xgb.load_model(os.path.join(MODEL_DIR, "phishing_xgboost.json"))
-        model_lstm = load_model(os.path.join(MODEL_DIR, "phishing_lstm.keras"))
+        model_xgb.load_model(os.path.join(MODEL_DIR, "xgb_model.json"))
+        model_nn = load_model(os.path.join(MODEL_DIR, "phishing_nn.keras"))
+        print(f"✅ Đã nạp pipeline mới: NN + XGBoost, threshold={META['threshold']}, "
+              f"whitelist={len(META['trusted_domains'])} domains")
         return True
     except Exception as e:
         print(f"❌ LỖI NẠP MODEL: {e}")
         return False
 
+
 load_all_models()
+
+
+@app.get("/health")
+async def health():
+    """Kiểm tra nhanh service và trạng thái nạp model (dùng cho Render health check)."""
+    loaded = all(v is not None for v in [model_nn, model_xgb, tokenizer_index, scaler])
+    return {"status": "ok" if loaded else "degraded",
+            "models_loaded": loaded,
+            "threshold": META["threshold"]}
+
 
 # --- 🛡️ BẢO MẬT: OWASP TOP 10 (SSRF & Input Validation) ---
 def is_safe_url(url: str) -> bool:
@@ -76,6 +93,7 @@ def is_safe_url(url: str) -> bool:
         return not (ip_obj.is_loopback or ip_obj.is_private or ip_obj.is_link_local)
     except: return False
 
+
 class URLRequest(BaseModel):
     url: str
     @field_validator('url')
@@ -83,8 +101,9 @@ class URLRequest(BaseModel):
     def validate_input(cls, v):
         v = v.strip()
         if not v or len(v) > 2048: raise ValueError('URL invalid or too long')
-        v = re.sub(r'[<>"\'\s]', '', v)
+        v = re.sub(r'[<>\"\'\s]', '', v)
         return v
+
 
 # --- 🔍 TẦNG TRUY VẤN: URLHAUS API (CHUYÊN DỤNG) ---
 def check_urlhaus(url: str):
@@ -97,7 +116,7 @@ def check_urlhaus(url: str):
     endpoint = "https://urlhaus-api.abuse.ch/v1/url/"
     headers = {'Auth-Key': api_key}
     data = {'url': url}
-    
+
     try:
         response = requests.post(endpoint, data=data, headers=headers, timeout=5)
         res_json = response.json()
@@ -115,6 +134,7 @@ def check_urlhaus(url: str):
             }
         return None
     except: return None
+
 
 # --- 🔍 TẦNG TRUY VẤN: GOOGLE SAFE BROWSING ---
 def check_google_safe_browsing(url: str):
@@ -142,6 +162,25 @@ def check_google_safe_browsing(url: str):
         return None
     except: return None
 
+
+def predict_with_pipeline(url: str):
+    """Đúng logic predict_url của notebook: whitelist -> 18 features -> scaler
+    -> NN -> XGBoost stack -> ngưỡng trong meta.json. Trả về (status, prob, nn_prob)."""
+    u = str(url).strip().lower()
+    rd = registrable_domain(u)
+    if rd in META["trusted_domains"]:  # whitelist: so sánh domain đăng ký, không dùng substring
+        return "Safe", 0.0, 0.0, "whitelist"
+    feats = np.array([extract_features(u)], dtype=np.float32)
+    scaled = scaler.transform(feats)
+    seq = pad_post(texts_to_char_sequences([u], tokenizer_index, tokenizer_oov),
+                   META["max_len"])
+    nn_p = float(model_nn.predict([np.array(seq), scaled], verbose=0).ravel()[0])
+    stack = np.column_stack([[nn_p], scaled])  # [nn_prob, 18 features đã chuẩn hóa]
+    p = float(model_xgb.predict_proba(stack)[0][1])
+    status = "Phishing" if p >= META["threshold"] else "Safe"
+    return status, p, nn_p, "ai_analysis"
+
+
 @app.post("/predict")
 async def predict(request: URLRequest):
     raw_url = request.url
@@ -162,28 +201,36 @@ async def predict(request: URLRequest):
     google_res = check_google_safe_browsing(processed_url)
     if google_res: return google_res
 
-    # 4. AI Analysis
+    # 4. AI Analysis (pipeline mới)
     try:
+        if model_nn is None or model_xgb is None or tokenizer_index is None or scaler is None:
+            return {"status": "Error", "detail": "Models not loaded"}
+
+        status, prob, nn_prob, source = predict_with_pipeline(processed_url)
+
+        if source == "whitelist":
+            return {
+                "url": raw_url, "status": status, "probability": 0.0, "risk_level": "Low",
+                "technical_report": {
+                    "domain_age": "N/A",
+                    "dns_status": "Unknown",
+                    "impersonation_risk": "Low",
+                    "is_shortened": False
+                },
+                "source": "whitelist"
+            }
+
         adv = get_advanced_insights(processed_url)
-        feats = np.array([extract_basic_features(processed_url)], dtype=float)
-        prob_xgb = float(model_xgb.predict_proba(feats)[0][1])
-        seqs = tokenizer.texts_to_sequences([processed_url])
-        padded = pad_sequences(seqs, maxlen=200)
-        prob_lstm = float(model_lstm.predict(padded, verbose=0)[0][0])
-        
-        final_prob = (prob_xgb * 0.4) + (prob_lstm * 0.6)
-        if adv.get('is_new_domain'): final_prob = min(0.99, final_prob + 0.15)
-        
-        status = "Phishing" if final_prob >= 0.7 else ("Suspicious" if final_prob >= 0.4 else "Safe")
-        risk = "High" if final_prob >= 0.7 else ("Medium" if final_prob >= 0.4 else "Low")
-        
+        risk = "High" if prob >= 0.7 else ("Medium" if prob >= 0.4 else "Low")
+
         return {
-            "url": raw_url, "status": status, "probability": round(final_prob, 4), "risk_level": risk,
+            "url": raw_url, "status": status, "probability": round(prob, 4), "risk_level": risk,
             "technical_report": {
                 "domain_age": adv.get('domain_age_days', "N/A"),
                 "dns_status": adv.get('dns_status', "Unknown"),
                 "impersonation_risk": adv.get('impersonation_risk', "Low"),
-                "is_shortened": adv.get('is_shortened', False)
+                "is_shortened": adv.get('is_shortened', False),
+                "nn_probability": round(nn_prob, 4)
             },
             "source": "ai_analysis"
         }
