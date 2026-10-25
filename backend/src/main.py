@@ -181,17 +181,47 @@ def predict_with_pipeline(url: str):
     return status, p, nn_p, "ai_analysis"
 
 
+def normalize_db_record(record, raw_url):
+    """Chuẩn hóa row Supabase về đúng shape chuẩn của API.
+    check_url_in_db trả nguyên row DB (field không xác định) nên FE không đọc
+    được -> hiển thị sai. Chỉ tin 2 nguồn đã biết; shape lạ thì trả None để
+    rơi xuống các tầng sau thay vì trả verdict không rõ ràng."""
+    source = record.get("source", "")
+    if source == "database_blacklist":
+        status, prob, risk = "Phishing", 1.0, "High"
+    elif source == "database_whitelist":
+        status, prob, risk = "Safe", 0.0, "Low"
+    else:
+        return None
+    tr = record.get("technical_report") or {}
+    return {
+        "url": record.get("url", raw_url),
+        "status": status, "probability": prob, "risk_level": risk,
+        "technical_report": {
+            "domain_age": tr.get("domain_age", "N/A"),
+            "dns_status": tr.get("dns_status", "Unknown"),
+            "impersonation_risk": tr.get("impersonation_risk", "Low"),
+            "is_shortened": bool(tr.get("is_shortened", False)),
+        },
+        "source": source,
+    }
+
+
 @app.post("/predict")
 async def predict(request: URLRequest):
     raw_url = request.url
     processed_url = raw_url.lower() if raw_url.startswith("http") else "http://" + raw_url.lower()
 
     if not is_safe_url(processed_url):
-        return {"status": "Error", "detail": "URL blocked for security reasons"}
+        # Lỗi phải trả HTTP status thật, không trả 200 kèm {"status": "Error"}
+        # vì FE đọc response.ok sẽ tưởng là kết quả hợp lệ.
+        raise HTTPException(status_code=400, detail="URL blocked for security reasons")
 
-    # 1. DB Nội bộ
+    # 1. DB Nội bộ (đã chuẩn hóa về shape chuẩn; shape lạ thì bỏ qua)
     db_record = check_url_in_db(raw_url)
-    if db_record: return db_record
+    if db_record:
+        normalized = normalize_db_record(db_record, raw_url)
+        if normalized: return normalized
 
     # 2. URLhaus API (Chuyên dụng với Auth-Key)
     urlhaus_res = check_urlhaus(processed_url)
@@ -202,10 +232,9 @@ async def predict(request: URLRequest):
     if google_res: return google_res
 
     # 4. AI Analysis (pipeline mới)
+    if model_nn is None or model_xgb is None or tokenizer_index is None or scaler is None:
+        raise HTTPException(status_code=503, detail="Models not loaded")
     try:
-        if model_nn is None or model_xgb is None or tokenizer_index is None or scaler is None:
-            return {"status": "Error", "detail": "Models not loaded"}
-
         status, prob, nn_prob, source = predict_with_pipeline(processed_url)
 
         if source == "whitelist":
@@ -234,8 +263,10 @@ async def predict(request: URLRequest):
             },
             "source": "ai_analysis"
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        return {"status": "Error", "detail": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
