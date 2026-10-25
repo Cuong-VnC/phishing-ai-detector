@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phishing Guardian | Bảo mật thông minh</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <title>ScamShield-AI | Kiểm tra link lừa đảo</title>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -13,10 +12,10 @@
         <nav class="navbar">
             <div class="logo">
                 <i data-lucide="shield-check"></i>
-                <span>Phishing<strong>Guardian</strong></span>
+                <span>ScamShield-AI</span>
             </div>
             <div class="system-status">
-                <span class="dot"></span> Hệ thống đang bảo vệ
+                <span class="dot"></span> Đang hoạt động
             </div>
         </nav>
 
@@ -24,7 +23,7 @@
             <div class="search-card">
                 <div class="input-group">
                     <i data-lucide="link" class="icon-link"></i>
-                    <input type="text" id="urlInput" placeholder="Dán địa chỉ trang web vào đây để kiểm tra..." autocomplete="off">
+                    <input type="text" id="urlInput" placeholder="Dán link cần kiểm tra vào đây..." autocomplete="off">
                 </div>
                 <button onclick="analyzeURL()" id="scanBtn">
                     <span>Kiểm tra ngay</span>
@@ -41,7 +40,7 @@
                     </div>
                     <div class="verdict-info">
                         <h2 id="verdictText">Kết quả phân tích</h2>
-                        <p id="probabilityDesc">Độ tin cậy của đánh giá này dựa trên các chỉ số kỹ thuật.</p>
+                        <p id="probabilityDesc">Kết quả dựa trên các chỉ số kỹ thuật của đường link.</p>
                     </div>
                 </div>
 
@@ -81,6 +80,10 @@
                 </button>
             </div>
         </main>
+
+        <footer class="footer">
+            ScamShield-AI — Dự án học tập phát hiện URL lừa đảo bằng học máy
+        </footer>
     </div>
 
     <script src="script.js"></script>

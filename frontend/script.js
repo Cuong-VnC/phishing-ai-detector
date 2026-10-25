@@ -1,5 +1,5 @@
 /**
- * PHISHING GUARDIAN AI - FRONTEND LOGIC
+ * SCAMSHIELD-AI - FRONTEND LOGIC
  */
 
 const API_CONFIG = {
@@ -65,7 +65,7 @@ async function analyzeURL() {
         if (error.name === 'AbortError') {
             alert("❌ Máy chủ phản hồi chậm (quá 90 giây), vui lòng thử lại.");
         } else {
-            alert(`❌ Không thể kết nối tới PhishingGuardian: ${error.message}`);
+            alert(`❌ Không thể kết nối tới ScamShield-AI: ${error.message}`);
         }
     } finally {
         scanBtn.disabled = false;
