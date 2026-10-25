@@ -31,14 +31,12 @@ async function analyzeURL() {
         return;
     }
 
-    // 1. Hiển thị Popup quét (Hiệu ứng radar/vân tay)
-    const popup = document.getElementById('scanPopup');
-    if (popup) popup.style.display = 'flex';
-
-    // 2. Reset giao diện cũ
-    document.getElementById('initial-view').style.display = 'none';
+    // Loading đơn giản: khóa nút + đổi nhãn, không popup, không delay giả.
+    const scanBtn = document.getElementById('scanBtn');
+    const originalBtnHTML = scanBtn.innerHTML;
+    scanBtn.disabled = true;
+    scanBtn.innerHTML = '<span>Đang kiểm tra...</span>';
     document.getElementById('result-area').style.display = 'none';
-    document.getElementById('loading').style.display = 'none';
 
     // Timeout: Render free cold start có thể mất 30-60s, nhưng không để treo vô hạn.
     const controller = new AbortController();
@@ -59,23 +57,30 @@ async function analyzeURL() {
         }
 
         const data = await response.json();
-
-        // Ẩn popup và hiển thị kết quả sau 1.2s để tạo hiệu ứng chuyên nghiệp
-        setTimeout(() => {
-            if (popup) popup.style.display = 'none';
-            displayResult(data);
-        }, 1200);
+        displayResult(data);
 
     } catch (error) {
         clearTimeout(timeoutId);
-        if (popup) popup.style.display = 'none';
         console.error("Lỗi:", error);
         if (error.name === 'AbortError') {
             alert("❌ Máy chủ phản hồi chậm (quá 90 giây), vui lòng thử lại.");
         } else {
             alert(`❌ Không thể kết nối tới PhishingGuardian: ${error.message}`);
         }
+    } finally {
+        scanBtn.disabled = false;
+        scanBtn.innerHTML = originalBtnHTML;
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
+}
+
+// Reset inline: xóa kết quả và ô nhập, không reload cả trang.
+function resetCheck() {
+    document.getElementById('urlInput').value = '';
+    document.getElementById('result-area').style.display = 'none';
+    document.getElementById('urlInput').focus();
 }
 
 function displayResult(data) {

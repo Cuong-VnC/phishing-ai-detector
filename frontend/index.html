@@ -9,8 +9,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="light-glow"></div>
-
     <div class="container">
         <nav class="navbar">
             <div class="logo">
@@ -21,11 +19,6 @@
                 <span class="dot"></span> Hệ thống đang bảo vệ
             </div>
         </nav>
-
-        <header class="hero">
-            <h1>Kiểm tra liên kết an toàn</h1>
-            <p>Hệ thống phân tích URL dựa trên trí tuệ nhân tạo (XGBoost + LSTM) và Databae 1M+ URL lừa đảo cập nhật liên tục để bảo vệ bạn khỏi các trang web lừa đảo và mã độc.</p>
-        </header>
 
         <section class="search-section">
             <div class="search-card">
@@ -40,29 +33,6 @@
             </div>
         </section>
 
-        <div id="initial-view" class="features-grid">
-            <div class="feature-item">
-                <i data-lucide="brain-circuit"></i>
-                <h3>Phân tích AI</h3>
-                <p>Kết hợp mô hình XGBoost và LSTM để đạt độ chính xác cao.</p>
-            </div>
-            <div class="feature-item">
-                <i data-lucide="database"></i>
-                <h3>Dữ liệu lớn</h3>
-                <p>Kiểm tra chéo với hàng triệu tên miền lừa đảo đã biết.</p>
-            </div>
-            <div class="feature-item">
-                <i data-lucide="zap"></i>
-                <h3>Tốc độ cao</h3>
-                <p>Nhận kết quả phân tích chỉ trong chưa đầy 2 giây.</p>
-            </div>
-        </div>
-
-        <div id="loading" class="loading-state" style="display:none">
-            <div class="spinner"></div>
-            <p>Đang quét các dấu hiệu nguy hiểm...</p>
-        </div>
-
         <main id="result-area" class="result-container" style="display:none">
             <div id="mainVerdict" class="verdict-main-card">
                 <div class="verdict-content">
@@ -74,7 +44,7 @@
                         <p id="probabilityDesc">Độ tin cậy của đánh giá này dựa trên các chỉ số kỹ thuật.</p>
                     </div>
                 </div>
-                
+
                 <div class="risk-bar-container">
                     <div class="risk-labels">
                         <span>Mức độ rủi ro</span>
@@ -104,31 +74,14 @@
                     <div class="detail-value" id="resShortened">Không</div>
                 </div>
             </div>
-            
+
             <div class="action-footer">
-                <button class="btn-secondary" onclick="location.reload()">
-                    <i data-lucide="rotate-ccw"></i> Kiểm tra link khác
+                <button class="btn-secondary" onclick="resetCheck()">
+                    <i data-lucide="rotate-ccw"></i> Xóa và kiểm tra link khác
                 </button>
             </div>
         </main>
     </div>
-
-    <div id="scanPopup" class="scan-overlay" style="display: none;">
-    <div class="scan-modal-small">
-        <div class="qr-scanner-box">
-            <div class="scan-corner t-l"></div>
-            <div class="scan-corner t-r"></div>
-            <div class="scan-corner b-l"></div>
-            <div class="scan-corner b-r"></div>
-            <div class="laser-line"></div>
-            <i data-lucide="fingerprint" class="scan-icon-bg"></i>
-        </div>
-        <div class="scan-text">
-            <p class="status-msg">ĐANG PHÂN TÍCH AI...</p>
-            <span class="sub-msg">Vui lòng đợi trong giây lát</span>
-        </div>
-    </div>
-</div>
 
     <script src="script.js"></script>
 </body>

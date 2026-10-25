@@ -26,16 +26,11 @@ body {
 .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
 
 /* Navbar */
-.navbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4rem; }
+.navbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
 .logo { display: flex; align-items: center; gap: 8px; color: var(--primary); font-size: 1.25rem; }
 .logo i { width: 32px; height: 32px; }
 .system-status { font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
 .dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); }
-
-/* Hero */
-.hero { text-align: center; margin-bottom: 3rem; }
-.hero h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; color: var(--text-main); letter-spacing: -0.02em; }
-.hero p { font-size: 1.1rem; color: var(--text-muted); max-width: 600px; margin: 0 auto; }
 
 /* Search Card - Chỗ này đã sửa lỗi khung trắng */
 .search-card {
@@ -60,13 +55,7 @@ body {
     transition: 0.2s;
 }
 #scanBtn:hover { background: #1d4ed8; transform: translateY(-2px); }
-
-/* Features Grid */
-.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 4rem; }
-.feature-item { text-align: center; padding: 1.5rem; background: transparent; border-radius: var(--radius); }
-.feature-item i { color: var(--primary); width: 40px; height: 40px; margin-bottom: 1rem; }
-.feature-item h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
-.feature-item p { font-size: 0.9rem; color: var(--text-muted); }
+#scanBtn:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
 
 /* Results */
 .verdict-main-card {
@@ -79,6 +68,8 @@ body {
 .verdict-info h2 { font-size: 1.5rem; font-weight: 700; }
 
 .risk-bar-container { background: #f1f5f9; padding: 1.25rem; border-radius: 16px; }
+.risk-labels { display: flex; justify-content: space-between; align-items: center; }
+.risk-labels span:last-child { font-weight: 700; }
 .bar-bg { height: 10px; background: #e2e8f0; border-radius: 5px; margin-top: 10px; overflow: hidden; }
 .bar-fill { height: 100%; width: 0%; border-radius: 5px; transition: 1s ease; }
 
@@ -92,67 +83,8 @@ body {
 
 /* Responsive */
 @media (max-width: 768px) {
-    .features-grid { grid-template-columns: 1fr; }
+    .details-grid { grid-template-columns: 1fr; }
     .search-card { flex-direction: column; padding: 1rem; }
     .input-group { width: 100%; padding: 0.5rem; }
     #scanBtn { width: 100%; justify-content: center; }
 }
-
-/* Lớp phủ mờ nhẹ phía sau */
-.scan-overlay {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(15, 23, 42, 0.6); /* Làm tối nền nhẹ nhàng */
-    backdrop-filter: blur(4px); /* Mờ nền phía sau cho chuyên nghiệp */
-    display: flex; justify-content: center; align-items: center;
-    z-index: 9999;
-}
-
-/* Khung Popup nhỏ */
-.scan-modal-small {
-    background: #0f172a; /* Cùng tông màu nền chính */
-    padding: 2rem;
-    border-radius: 24px;
-    border: 1px solid rgba(0, 242, 255, 0.2);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 242, 255, 0.1);
-    display: flex; flex-direction: column; align-items: center;
-    gap: 1.5rem;
-    width: 320px; /* Độ rộng nhỏ gọn */
-    animation: popupScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes popupScale {
-    from { transform: scale(0.8); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-/* Khung quét Laser thu nhỏ */
-.qr-scanner-box {
-    width: 120px; height: 120px;
-    position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    display: flex; justify-content: center; align-items: center;
-}
-
-.scan-icon-bg { width: 100px; height: 100px; color: rgba(0, 242, 255, 0.2); }
-
-.scan-corner { position: absolute; width: 15px; height: 15px; border: 3px solid var(--primary); }
-.t-l { top: -2px; left: -2px; border-right: none; border-bottom: none; }
-.t-r { top: -2px; right: -2px; border-left: none; border-bottom: none; }
-.b-l { bottom: -2px; left: -2px; border-right: none; border-top: none; }
-.b-r { bottom: -2px; right: -2px; border-left: none; border-top: none; }
-
-.laser-line {
-    position: absolute; width: 100%; height: 2px;
-    background: var(--primary);
-    box-shadow: 0 0 15px var(--primary);
-    animation: laserDown 1.5s ease-in-out infinite;
-}
-
-@keyframes laserDown {
-    0% { top: 0; } 50% { top: 100%; } 100% { top: 0; }
-}
-
-.scan-text { text-align: center; }
-.status-msg { color: var(--primary); font-weight: 700; letter-spacing: 1px; font-size: 0.9rem; }
-.sub-msg { color: var(--text-muted); font-size: 0.75rem; }
