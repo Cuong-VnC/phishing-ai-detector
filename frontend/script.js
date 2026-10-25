@@ -3,7 +3,7 @@
  */
 
 const API_CONFIG = {
-    BASE_URL: "https://phishing-guardian-api.onrender.com",
+    BASE_URL: "https://phishing-ai-api.onrender.com",
     ENDPOINTS: {
         PREDICT: "/predict"
     }
