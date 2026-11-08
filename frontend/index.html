@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="ScamShield-AI — Kiểm tra link lừa đảo bằng học máy, kèm thông tin tên miền chi tiết (DNS, WHOIS, TLS, HTTP).">
+    <meta name="description" content="ScamShield-AI — Dán link vào để kiểm tra trước khi bấm.">
     <title>ScamShield-AI | Kiểm tra link lừa đảo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,8 +30,7 @@
     <main class="container">
         <section class="hero">
             <h1>Kiểm tra link lừa đảo<br><span class="hero-accent">trước khi bạn bấm vào</span></h1>
-            <p class="hero-sub">Mô hình học máy (mạng nơ-ron + XGBoost) kết hợp kiểm tra tên miền thực tế:
-                DNS, tuổi domain, chứng chỉ TLS và khả năng truy cập — để biết link có an toàn hay không.</p>
+            <p class="hero-sub">Dán link vào để kiểm tra trước khi bấm.</p>
 
             <div class="search-card" id="searchCard">
                 <div class="input-group">
@@ -80,7 +79,7 @@
                     <div class="verdict-icon" id="verdictIcon"><i data-lucide="shield-check"></i></div>
                     <div class="verdict-text">
                         <h2 id="verdictTitle">Kết quả phân tích</h2>
-                        <p id="verdictDesc">Kết quả dựa trên mô hình AI và thông tin tên miền.</p>
+                        <p id="verdictDesc">Chi tiết kết quả ở bên dưới.</p>
                         <p class="verdict-url" id="verdictUrl"></p>
                     </div>
                     <div class="gauge" id="gaugeWrap" aria-label="Mức độ rủi ro">
@@ -173,20 +172,11 @@
             <ul class="history-list" id="historyList"></ul>
         </section>
 
-        <section class="how-card">
-            <h2><i data-lucide="info"></i> ScamShield-AI hoạt động thế nào?</h2>
-            <ol class="how-steps">
-                <li><strong>Phân tích bằng AI:</strong> mô hình mạng nơ-ron + XGBoost đánh giá 18 đặc trưng của URL (độ dài, ký tự đáng ngờ, tên miền giả mạo thương hiệu…).</li>
-                <li><strong>Kiểm tra tên miền thật:</strong> tra cứu DNS, WHOIS (tuổi domain, nhà đăng ký), chứng chỉ TLS và khả năng truy cập HTTP(S).</li>
-                <li><strong>Kết luận rõ ràng:</strong> an toàn, nghi ngờ, nguy hiểm — hoặc báo ngay khi tên miền không tồn tại / không hoạt động.</li>
-            </ol>
-            <p class="how-note">Lưu ý: đây là dự án học tập. Kết quả chỉ mang tính tham khảo — hãy luôn cẩn trọng trước khi nhập mật khẩu hay chuyển tiền trên bất kỳ trang web nào.</p>
-        </section>
     </main>
 
     <footer class="footer">
         <div class="container footer-inner">
-            <span>ScamShield-AI — Dự án học tập phát hiện URL lừa đảo bằng học máy</span>
+            <span>ScamShield-AI — Kết quả chỉ mang tính tham khảo.</span>
             <button type="button" class="btn-ghost btn-small" id="apiSwitchBtn" title="Đổi máy chủ API">Đổi máy chủ API</button>
         </div>
     </footer>

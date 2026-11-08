@@ -31,7 +31,7 @@ const API_BASE = resolveApiBase();
 
 const SOURCE_LABELS = {
     whitelist: "Danh sách tin cậy",
-    ai_analysis: "Mô hình AI (NN + XGBoost)",
+    ai_analysis: "Mô hình AI",
     database_blacklist: "Cơ sở dữ liệu đen",
     database_whitelist: "Cơ sở dữ liệu trắng",
     urlhaus_database: "URLhaus",
@@ -317,7 +317,7 @@ async function analyzeURL() {
     const loading = $("loadingBox");
     loading.hidden = false;
     const steps = [
-        "Đang phân tích URL bằng mô hình AI…",
+        "Đang phân tích link…",
         "Đang tra cứu DNS, WHOIS, chứng chỉ TLS…",
         "Đang kiểm tra khả năng truy cập của tên miền…",
     ];
