@@ -3,88 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ScamShield-AI — Kiểm tra link lừa đảo bằng học máy, kèm thông tin tên miền chi tiết (DNS, WHOIS, TLS, HTTP).">
     <title>ScamShield-AI | Kiểm tra link lừa đảo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <nav class="navbar">
-            <div class="logo">
-                <i data-lucide="shield-check"></i>
-                <span>ScamShield-AI</span>
+    <header class="topbar">
+        <div class="container topbar-inner">
+            <a class="brand" href="#" onclick="return false">
+                <span class="brand-icon"><i data-lucide="shield-check"></i></span>
+                <span class="brand-text">ScamShield<span class="brand-ai">-AI</span></span>
+            </a>
+            <div class="topbar-right">
+                <span class="api-pill" id="apiPill" title="Trạng thái máy chủ">
+                    <span class="api-dot" id="apiDot"></span>
+                    <span id="apiStatusText">Đang kiểm tra máy chủ…</span>
+                </span>
             </div>
-            <div class="system-status">
-                <span class="dot"></span> Đang hoạt động
-            </div>
-        </nav>
+        </div>
+    </header>
 
-        <section class="search-section">
-            <div class="search-card">
+    <main class="container">
+        <section class="hero">
+            <h1>Kiểm tra link lừa đảo<br><span class="hero-accent">trước khi bạn bấm vào</span></h1>
+            <p class="hero-sub">Mô hình học máy (mạng nơ-ron + XGBoost) kết hợp kiểm tra tên miền thực tế:
+                DNS, tuổi domain, chứng chỉ TLS và khả năng truy cập — để biết link có an toàn hay không.</p>
+
+            <div class="search-card" id="searchCard">
                 <div class="input-group">
-                    <i data-lucide="link" class="icon-link"></i>
-                    <input type="text" id="urlInput" placeholder="Dán link cần kiểm tra vào đây..." autocomplete="off">
+                    <i data-lucide="link-2" class="input-icon"></i>
+                    <input type="text" id="urlInput" placeholder="Dán link cần kiểm tra, ví dụ: https://vietcombank-dangnhap.com/login"
+                           autocomplete="off" spellcheck="false" aria-label="URL cần kiểm tra">
+                    <button type="button" class="clear-input" id="clearInputBtn" title="Xóa ô nhập" aria-label="Xóa ô nhập">
+                        <i data-lucide="x"></i>
+                    </button>
                 </div>
-                <button onclick="analyzeURL()" id="scanBtn">
+                <button type="button" id="scanBtn">
+                    <i data-lucide="shield-check"></i>
                     <span>Kiểm tra ngay</span>
-                    <i data-lucide="arrow-right"></i>
+                </button>
+            </div>
+            <p class="input-hint" id="inputHint">Mẹo: nhập cả link đầy đủ (có https://) để có kết quả chính xác nhất.</p>
+
+            <div class="samples">
+                <span class="samples-label">Thử nhanh:</span>
+                <button type="button" class="chip chip-safe" data-url="https://www.google.com">google.com</button>
+                <button type="button" class="chip chip-safe" data-url="https://www.youtube.com">youtube.com</button>
+                <button type="button" class="chip chip-bad" data-url="https://vietcombank-dangnhap.com/login">vietcombank-dangnhap.com</button>
+                <button type="button" class="chip chip-bad" data-url="https://techcombank-bao-mat.com/signin">techcombank-bao-mat.com</button>
+            </div>
+        </section>
+
+        <section id="errorBox" class="error-box" hidden>
+            <i data-lucide="alert-triangle"></i>
+            <div>
+                <strong id="errorTitle">Không thể kiểm tra</strong>
+                <p id="errorText"></p>
+            </div>
+        </section>
+
+        <section id="loadingBox" class="loading-box" hidden>
+            <div class="spinner" aria-hidden="true"></div>
+            <div>
+                <strong>Đang kiểm tra…</strong>
+                <p id="loadingStep">Đang phân tích URL bằng mô hình AI…</p>
+            </div>
+        </section>
+
+        <section id="resultArea" class="result-area" hidden>
+            <div class="verdict-card" id="verdictCard">
+                <div class="verdict-top">
+                    <div class="verdict-icon" id="verdictIcon"><i data-lucide="shield-check"></i></div>
+                    <div class="verdict-text">
+                        <h2 id="verdictTitle">Kết quả phân tích</h2>
+                        <p id="verdictDesc">Kết quả dựa trên mô hình AI và thông tin tên miền.</p>
+                        <p class="verdict-url" id="verdictUrl"></p>
+                    </div>
+                    <div class="gauge" id="gaugeWrap" aria-label="Mức độ rủi ro">
+                        <svg viewBox="0 0 120 120" class="gauge-svg">
+                            <circle cx="60" cy="60" r="52" class="gauge-track"></circle>
+                            <circle cx="60" cy="60" r="52" class="gauge-fill" id="gaugeFill"></circle>
+                        </svg>
+                        <div class="gauge-center">
+                            <span class="gauge-value" id="gaugeValue">—</span>
+                            <span class="gauge-label">rủi ro</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="verdict-meta">
+                    <span class="meta-chip" id="sourceChip">Nguồn: —</span>
+                    <span class="meta-chip" id="riskChip">Mức rủi ro: —</span>
+                    <span class="meta-chip" id="nnChip" hidden>NN: —</span>
+                </div>
+            </div>
+
+            <div class="warning-banner" id="warningBanner" hidden>
+                <i data-lucide="alert-triangle"></i>
+                <span id="warningText"></span>
+            </div>
+
+            <details class="details-card" id="techDetails" open>
+                <summary><i data-lucide="activity"></i> Báo cáo kỹ thuật</summary>
+                <div class="details-body">
+                    <div class="kv-grid">
+                        <div class="kv"><span class="kv-label">Tuổi tên miền</span><span class="kv-value" id="resAge">—</span></div>
+                        <div class="kv"><span class="kv-label">Trạng thái DNS</span><span class="kv-value" id="resDNS">—</span></div>
+                        <div class="kv"><span class="kv-label">Rủi ro mạo danh</span><span class="kv-value" id="resImpersonation">—</span></div>
+                        <div class="kv"><span class="kv-label">Link rút gọn</span><span class="kv-value" id="resShortened">—</span></div>
+                    </div>
+                </div>
+            </details>
+
+            <details class="details-card" id="domainDetails">
+                <summary><i data-lucide="globe"></i> Thông tin tên miền chi tiết</summary>
+                <div class="details-body">
+                    <div class="kv-grid">
+                        <div class="kv"><span class="kv-label">Tên miền đăng ký</span><span class="kv-value" id="diDomain">—</span></div>
+                        <div class="kv"><span class="kv-label">Host</span><span class="kv-value" id="diHost">—</span></div>
+                        <div class="kv"><span class="kv-label">Trạng thái tên miền</span><span class="kv-value" id="diStatus">—</span></div>
+                        <div class="kv"><span class="kv-label">Bản ghi A</span><span class="kv-value mono" id="diA">—</span></div>
+                        <div class="kv"><span class="kv-label">Bản ghi AAAA</span><span class="kv-value mono" id="diAAAA">—</span></div>
+                        <div class="kv"><span class="kv-label">Bản ghi MX</span><span class="kv-value mono" id="diMX">—</span></div>
+                        <div class="kv"><span class="kv-label">Bản ghi NS</span><span class="kv-value mono" id="diNS">—</span></div>
+                        <div class="kv"><span class="kv-label">Bản ghi TXT</span><span class="kv-value mono" id="diTXT">—</span></div>
+                    </div>
+                    <h3 class="subhead"><i data-lucide="file-text"></i> WHOIS</h3>
+                    <div class="kv-grid">
+                        <div class="kv"><span class="kv-label">Ngày đăng ký</span><span class="kv-value" id="diWhoisCreated">—</span></div>
+                        <div class="kv"><span class="kv-label">Ngày hết hạn</span><span class="kv-value" id="diWhoisExpires">—</span></div>
+                        <div class="kv"><span class="kv-label">Nhà đăng ký</span><span class="kv-value" id="diRegistrar">—</span></div>
+                        <div class="kv"><span class="kv-label">Tuổi domain</span><span class="kv-value" id="diWhoisAge">—</span></div>
+                    </div>
+                    <h3 class="subhead"><i data-lucide="lock"></i> Chứng chỉ TLS</h3>
+                    <div class="kv-grid">
+                        <div class="kv"><span class="kv-label">Hợp lệ</span><span class="kv-value" id="diTlsValid">—</span></div>
+                        <div class="kv"><span class="kv-label">Cấp bởi</span><span class="kv-value" id="diTlsIssuer">—</span></div>
+                        <div class="kv"><span class="kv-label">Hết hạn</span><span class="kv-value" id="diTlsExpires">—</span></div>
+                        <div class="kv"><span class="kv-label">Còn lại</span><span class="kv-value" id="diTlsDays">—</span></div>
+                    </div>
+                    <h3 class="subhead"><i data-lucide="wifi"></i> Truy cập HTTP(S)</h3>
+                    <div class="kv-grid">
+                        <div class="kv"><span class="kv-label">Truy cập được</span><span class="kv-value" id="diHttpOk">—</span></div>
+                        <div class="kv"><span class="kv-label">Mã trạng thái</span><span class="kv-value" id="diHttpStatus">—</span></div>
+                        <div class="kv"><span class="kv-label">Máy chủ web</span><span class="kv-value" id="diHttpServer">—</span></div>
+                        <div class="kv"><span class="kv-label">Thời gian phản hồi</span><span class="kv-value" id="diHttpTime">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">URL cuối cùng</span><span class="kv-value mono wrap" id="diHttpFinal">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">Chuỗi chuyển hướng</span><span class="kv-value mono wrap" id="diHttpRedirects">—</span></div>
+                    </div>
+                </div>
+            </details>
+
+            <div class="action-footer">
+                <button class="btn-secondary" id="resetBtn">
+                    <i data-lucide="rotate-ccw"></i> Kiểm tra link khác
                 </button>
             </div>
         </section>
 
-        <main id="result-area" class="result-container" style="display:none">
-            <div id="mainVerdict" class="verdict-main-card">
-                <div class="verdict-content">
-                    <div class="verdict-icon" id="verdictIcon">
-                        <i data-lucide="shield-check"></i>
-                    </div>
-                    <div class="verdict-info">
-                        <h2 id="verdictText">Kết quả phân tích</h2>
-                        <p id="probabilityDesc">Kết quả dựa trên các chỉ số kỹ thuật của đường link.</p>
-                    </div>
-                </div>
-
-                <div class="risk-bar-container">
-                    <div class="risk-labels">
-                        <span>Mức độ rủi ro</span>
-                        <span id="probabilityText">0%</span>
-                    </div>
-                    <div class="bar-bg">
-                        <div id="probFill" class="bar-fill"></div>
-                    </div>
-                </div>
+        <section class="history-card" id="historyCard">
+            <div class="history-head">
+                <h2><i data-lucide="history"></i> Lịch sử kiểm tra gần đây</h2>
+                <button type="button" class="btn-ghost" id="clearHistoryBtn">Xóa lịch sử</button>
             </div>
+            <p class="history-empty" id="historyEmpty">Chưa có lịch sử — các link bạn kiểm tra sẽ hiện ở đây (chỉ lưu trên trình duyệt của bạn).</p>
+            <ul class="history-list" id="historyList"></ul>
+        </section>
 
-            <div class="details-grid">
-                <div class="detail-card">
-                    <div class="detail-label">Tuổi tên miền</div>
-                    <div class="detail-value" id="resAge">N/A</div>
-                </div>
-                <div class="detail-card">
-                    <div class="detail-label">Trạng thái DNS</div>
-                    <div class="detail-value" id="resDNS">Unknown</div>
-                </div>
-                <div class="detail-card">
-                    <div class="detail-label">Rủi ro mạo danh</div>
-                    <div class="detail-value" id="resImpersonation">Thấp</div>
-                </div>
-                <div class="detail-card">
-                    <div class="detail-label">Link rút gọn</div>
-                    <div class="detail-value" id="resShortened">Không</div>
-                </div>
-            </div>
+        <section class="how-card">
+            <h2><i data-lucide="info"></i> ScamShield-AI hoạt động thế nào?</h2>
+            <ol class="how-steps">
+                <li><strong>Phân tích bằng AI:</strong> mô hình mạng nơ-ron + XGBoost đánh giá 18 đặc trưng của URL (độ dài, ký tự đáng ngờ, tên miền giả mạo thương hiệu…).</li>
+                <li><strong>Kiểm tra tên miền thật:</strong> tra cứu DNS, WHOIS (tuổi domain, nhà đăng ký), chứng chỉ TLS và khả năng truy cập HTTP(S).</li>
+                <li><strong>Kết luận rõ ràng:</strong> an toàn, nghi ngờ, nguy hiểm — hoặc báo ngay khi tên miền không tồn tại / không hoạt động.</li>
+            </ol>
+            <p class="how-note">Lưu ý: đây là dự án học tập. Kết quả chỉ mang tính tham khảo — hãy luôn cẩn trọng trước khi nhập mật khẩu hay chuyển tiền trên bất kỳ trang web nào.</p>
+        </section>
+    </main>
 
-            <div class="action-footer">
-                <button class="btn-secondary" onclick="resetCheck()">
-                    <i data-lucide="rotate-ccw"></i> Xóa và kiểm tra link khác
-                </button>
-            </div>
-        </main>
-
-        <footer class="footer">
-            ScamShield-AI — Dự án học tập phát hiện URL lừa đảo bằng học máy
-        </footer>
-    </div>
+    <footer class="footer">
+        <div class="container footer-inner">
+            <span>ScamShield-AI — Dự án học tập phát hiện URL lừa đảo bằng học máy</span>
+            <button type="button" class="btn-ghost btn-small" id="apiSwitchBtn" title="Đổi máy chủ API">Đổi máy chủ API</button>
+        </div>
+    </footer>
 
     <script src="script.js"></script>
 </body>
