@@ -27,6 +27,7 @@ if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
 from features import (extract_features, registrable_domain, get_advanced_insights,
                       load_tokenizer_json, texts_to_char_sequences, pad_post, FEATURE_NAMES,
                       skeletonize, f2_doc)
+from tfidf_compat import repair_tfidf_idf
 from database import check_url_in_db
 from domain_info import get_domain_info, resolve_dns
 
@@ -64,6 +65,12 @@ def load_all_models():
             scaler = pickle.load(f)
         with open(os.path.join(MODEL_DIR, "tfidf_f2.pkl"), "rb") as f:
             tfidf_f2 = pickle.load(f)
+        # Pickle lưu bằng sklearn 1.6.1 (Kaggle) nhưng Render chạy sklearn
+        # 1.3.2: vector idf nằm trong __dict__['idf_'] mà bản 1.3.2 không đọc
+        # được (đọc qua _idf_diag) -> transform() lỗi "idf vector is not
+        # fitted". Dựng lại _idf_diag từ mảng idf đã lưu (no-op trên 1.6.1).
+        if not repair_tfidf_idf(tfidf_f2):
+            print("⚠️ Cảnh báo: không sửa được TF-IDF compat, /predict có thể lỗi idf")
         with open(os.path.join(MODEL_DIR, "svd_f2.pkl"), "rb") as f:
             svd_f2 = pickle.load(f)
         model_xgb = xgb.XGBClassifier()
