@@ -236,7 +236,6 @@ button { font-family: inherit; }
     cursor: pointer; font-weight: 600; font-size: .88rem; padding: .3rem .6rem; border-radius: 8px;
 }
 .btn-ghost:hover { color: var(--danger); background: var(--danger-soft); }
-.btn-small { font-size: .8rem; }
 
 /* ---------- History ---------- */
 .history-card {

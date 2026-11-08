@@ -11,6 +11,9 @@ const HISTORY_KEY = "scamshield_history_v1";
 const API_KEY = "scamshield_api_base";
 const MAX_HISTORY = 8;
 const GAUGE_CIRC = 326.7; // 2 * PI * 52
+// Quy tắc hiển thị: mục nào không có dữ liệu thì ghi "Không tìm thấy",
+// không bao giờ để trống hay chỉ hiện dấu gạch ngang.
+const NF = "Không tìm thấy";
 
 function resolveApiBase() {
     const params = new URLSearchParams(window.location.search);
@@ -46,13 +49,13 @@ function refreshIcons() {
 }
 
 function fmtDate(iso) {
-    if (!iso) return "Không rõ";
+    if (!iso) return NF;
     const d = new Date(iso + (iso.length === 10 ? "T00:00:00" : ""));
     return isNaN(d) ? iso : d.toLocaleDateString("vi-VN");
 }
 
 function fmtList(arr) {
-    if (!arr || !arr.length) return "—";
+    if (!arr || !arr.length) return NF;
     return arr.join(", ");
 }
 
@@ -163,53 +166,109 @@ function setGauge(prob, color) {
     value.textContent = pct.toFixed(0) + "%";
 }
 
+/* Danh sách đầy đủ các ô trong mục "Thông tin tên miền chi tiết" — dùng để
+   điền "Không tìm thấy" khi domain_info là null hoặc thiếu nhóm con. */
+const DI_IDS = [
+    "diDomain", "diHost", "diStatus",
+    "diA", "diAAAA", "diMX", "diNS", "diTXT", "diCname", "diSoa", "diPtr",
+    "diSpf", "diDmarc", "diDnssec",
+    "diWhoisCreated", "diWhoisExpires", "diWhoisUpdated", "diRegistrar",
+    "diWhoisAge", "diWhoisNs", "diWhoisStatus",
+    "diTlsValid", "diTlsIssuer", "diTlsExpires", "diTlsDays",
+    "diTlsSans", "diTlsSigAlg", "diTlsVersion", "diTlsCipher",
+    "diHttpOk", "diHttpStatus", "diHttpServer", "diHttpTime", "diHttpFinal",
+    "diHttpRedirects", "diHttpContentType", "diHttpContentLength",
+    "diHttpRedirectCount", "diHttpIp", "diHttpIpInfo",
+];
+
+function setText(id, v) {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = (v === null || v === undefined || v === "") ? NF : v;
+}
+
+function setList(id, arr) {
+    setText(id, (arr && arr.length) ? arr.join(", ") : NF);
+}
+
 function fillDomainInfo(info) {
     if (!info) {
-        ["diDomain", "diHost", "diStatus", "diA", "diAAAA", "diMX", "diNS", "diTXT",
-         "diWhoisCreated", "diWhoisExpires", "diRegistrar", "diWhoisAge",
-         "diTlsValid", "diTlsIssuer", "diTlsExpires", "diTlsDays",
-         "diHttpOk", "diHttpStatus", "diHttpServer", "diHttpTime", "diHttpFinal", "diHttpRedirects"
-        ].forEach((id) => { $(id).textContent = "—"; });
+        DI_IDS.forEach((id) => setText(id, NF));
         return;
     }
     const dns = info.dns || {};
     const whois = info.whois || {};
     const tls = info.tls || {};
     const http = info.http || {};
-    $("diDomain").textContent = info.domain || "—";
-    $("diHost").textContent = info.host || "—";
+    setText("diDomain", info.domain);
+    setText("diHost", info.host);
     const statusMap = {
         active: "Đang hoạt động", inactive: "Không hoạt động",
-        nonexistent: "Không tồn tại", unknown: "Không xác định",
+        nonexistent: "Không tồn tại", unknown: NF,
     };
-    $("diStatus").textContent = statusMap[info.status] || (info.status || "—");
-    $("diA").textContent = fmtList(dns.a);
-    $("diAAAA").textContent = fmtList(dns.aaaa);
-    $("diMX").textContent = fmtList(dns.mx);
-    $("diNS").textContent = fmtList(dns.ns);
-    $("diTXT").textContent = fmtList(dns.txt);
-    $("diWhoisCreated").textContent = fmtDate(whois.created);
-    $("diWhoisExpires").textContent = fmtDate(whois.expires);
-    $("diRegistrar").textContent = whois.registrar || "Không rõ";
-    $("diWhoisAge").textContent = (whois.age_days !== null && whois.age_days !== undefined)
-        ? whois.age_days.toLocaleString("vi-VN") + " ngày" : "Không rõ";
-    $("diTlsValid").textContent = !tls.checked ? "Không kiểm tra"
-        : (tls.valid === true ? "Hợp lệ" : (tls.valid === false ? "Không hợp lệ" : "Không rõ"));
-    $("diTlsIssuer").textContent = tls.issuer || "—";
-    $("diTlsExpires").textContent = fmtDate(tls.expires);
-    $("diTlsDays").textContent = (tls.days_left !== null && tls.days_left !== undefined)
+    setText("diStatus", statusMap[info.status] || info.status || NF);
+    setList("diA", dns.a);
+    setList("diAAAA", dns.aaaa);
+    setList("diMX", dns.mx);
+    setList("diNS", dns.ns);
+    setList("diTXT", dns.txt);
+    setList("diCname", dns.cname);
+    setText("diSoa", dns.soa
+        ? (dns.soa.serial
+            ? `${dns.soa.primary_ns || NF} (serial ${dns.soa.serial})`
+            : (dns.soa.primary_ns || NF))
+        : NF);
+    setList("diPtr", dns.ptr);
+    setText("diSpf", dns.spf);
+    setText("diDmarc", dns.dmarc
+        ? (dns.dmarc.policy ? `p=${dns.dmarc.policy}` : (dns.dmarc.record || NF))
+        : NF);
+    setText("diDnssec", dns.dnssec ? (dns.dnssec.enabled ? "Có" : "Không") : NF);
+    setText("diWhoisCreated", fmtDate(whois.created));
+    setText("diWhoisExpires", fmtDate(whois.expires));
+    setText("diWhoisUpdated", fmtDate(whois.updated));
+    setText("diRegistrar", whois.registrar);
+    setText("diWhoisAge", (whois.age_days !== null && whois.age_days !== undefined)
+        ? whois.age_days.toLocaleString("vi-VN") + " ngày" : NF);
+    setList("diWhoisNs", whois.name_servers);
+    setList("diWhoisStatus", whois.domain_status);
+    setText("diTlsValid", !tls.checked ? NF
+        : (tls.valid === true ? "Hợp lệ" : (tls.valid === false ? "Không hợp lệ" : NF)));
+    setText("diTlsIssuer", tls.issuer);
+    setText("diTlsExpires", fmtDate(tls.expires));
+    setText("diTlsDays", (tls.days_left !== null && tls.days_left !== undefined)
         ? (tls.days_left >= 0 ? `Còn ${tls.days_left} ngày` : `Hết hạn ${-tls.days_left} ngày trước`)
-        : "—";
-    $("diHttpOk").textContent = http.reachable === true ? "Có"
-        : (http.reachable === false ? `Không (${http.error || "lỗi kết nối"})` : "Không rõ");
-    $("diHttpStatus").textContent = http.status_code !== null && http.status_code !== undefined
-        ? String(http.status_code) : "—";
-    $("diHttpServer").textContent = http.server || "—";
-    $("diHttpTime").textContent = (http.response_time_ms !== null && http.response_time_ms !== undefined)
-        ? http.response_time_ms.toLocaleString("vi-VN") + " ms" : "—";
-    $("diHttpFinal").textContent = http.final_url || "—";
-    $("diHttpRedirects").textContent = http.redirects && http.redirects.length
-        ? http.redirects.join(" → ") : "Không có chuyển hướng";
+        : NF);
+    setList("diTlsSans", tls.sans);
+    setText("diTlsSigAlg", tls.sig_alg);
+    setText("diTlsVersion", tls.tls_version);
+    setText("diTlsCipher", tls.cipher
+        ? (tls.cipher_bits ? `${tls.cipher} (${tls.cipher_bits}-bit)` : tls.cipher)
+        : NF);
+    setText("diHttpOk", http.reachable === true ? "Có"
+        : (http.reachable === false ? `Không (${http.error || "lỗi kết nối"})` : NF));
+    setText("diHttpStatus", http.status_code !== null && http.status_code !== undefined
+        ? String(http.status_code) : NF);
+    setText("diHttpServer", http.server);
+    setText("diHttpTime", (http.response_time_ms !== null && http.response_time_ms !== undefined)
+        ? http.response_time_ms.toLocaleString("vi-VN") + " ms" : NF);
+    setText("diHttpFinal", http.final_url);
+    setText("diHttpRedirects", http.redirects && http.redirects.length
+        ? http.redirects.join(" → ") : "Không có chuyển hướng");
+    setText("diHttpContentType", http.content_type);
+    setText("diHttpContentLength", (http.content_length !== null && http.content_length !== undefined)
+        ? Number(http.content_length).toLocaleString("vi-VN") + " byte" : NF);
+    setText("diHttpRedirectCount", (http.redirect_count !== null && http.redirect_count !== undefined)
+        ? `${http.redirect_count} lần` : NF);
+    setText("diHttpIp", http.resolved_ip);
+    let ipInfo = NF;
+    const ip = http.ip_info;
+    if (ip) {
+        const place = [ip.city, ip.region, ip.country].filter(Boolean).join(", ");
+        const parts = [place, ip.isp, ip.asn].filter(Boolean);
+        if (parts.length) ipInfo = parts.join(" — ");
+    }
+    setText("diHttpIpInfo", ipInfo);
 }
 
 function displayResult(data) {
@@ -257,8 +316,8 @@ function displayResult(data) {
     }
 
     $("verdictUrl").textContent = data.url || "";
-    $("sourceChip").textContent = "Nguồn: " + (SOURCE_LABELS[data.source] || data.source || "—");
-    $("riskChip").textContent = "Mức rủi ro: " + (riskLevel || "—");
+    $("sourceChip").textContent = "Nguồn: " + (SOURCE_LABELS[data.source] || data.source || NF);
+    $("riskChip").textContent = "Mức rủi ro: " + (riskLevel || NF);
     const tr = data.technical_report || {};
     if (tr.nn_probability !== undefined && tr.nn_probability !== null) {
         $("nnChip").hidden = false;
@@ -275,13 +334,6 @@ function displayResult(data) {
     } else {
         warn.hidden = true;
     }
-
-    // Báo cáo kỹ thuật (giữ tương thích response cũ)
-    $("resAge").textContent = (tr.domain_age !== undefined && tr.domain_age !== "N/A" && tr.domain_age !== null)
-        ? tr.domain_age + " ngày" : "Không rõ";
-    $("resDNS").textContent = tr.dns_status || "—";
-    $("resImpersonation").textContent = tr.impersonation_risk || "Thấp";
-    $("resShortened").textContent = tr.is_shortened ? "Có" : "Không";
 
     fillDomainInfo(data.domain_info || null);
 
@@ -404,15 +456,5 @@ document.addEventListener("DOMContentLoaded", () => {
     $("clearHistoryBtn").addEventListener("click", () => {
         try { localStorage.removeItem(HISTORY_KEY); } catch (e) { /* ignore */ }
         renderHistory();
-    });
-    $("apiSwitchBtn").addEventListener("click", () => {
-        const current = API_BASE;
-        const next = window.prompt("Địa chỉ máy chủ API (để trống = mặc định):", current === DEFAULT_API ? "" : current);
-        if (next === null) return;
-        try {
-            if (next.trim()) localStorage.setItem(API_KEY, next.trim().replace(/\/$/, ""));
-            else localStorage.removeItem(API_KEY);
-        } catch (e) { /* ignore */ }
-        window.location.reload();
     });
 });

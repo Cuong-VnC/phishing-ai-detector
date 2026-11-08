@@ -105,18 +105,6 @@
                 <span id="warningText"></span>
             </div>
 
-            <details class="details-card" id="techDetails" open>
-                <summary><i data-lucide="activity"></i> Báo cáo kỹ thuật</summary>
-                <div class="details-body">
-                    <div class="kv-grid">
-                        <div class="kv"><span class="kv-label">Tuổi tên miền</span><span class="kv-value" id="resAge">—</span></div>
-                        <div class="kv"><span class="kv-label">Trạng thái DNS</span><span class="kv-value" id="resDNS">—</span></div>
-                        <div class="kv"><span class="kv-label">Rủi ro mạo danh</span><span class="kv-value" id="resImpersonation">—</span></div>
-                        <div class="kv"><span class="kv-label">Link rút gọn</span><span class="kv-value" id="resShortened">—</span></div>
-                    </div>
-                </div>
-            </details>
-
             <details class="details-card" id="domainDetails">
                 <summary><i data-lucide="globe"></i> Thông tin tên miền chi tiết</summary>
                 <div class="details-body">
@@ -129,6 +117,12 @@
                         <div class="kv"><span class="kv-label">Bản ghi MX</span><span class="kv-value mono" id="diMX">—</span></div>
                         <div class="kv"><span class="kv-label">Bản ghi NS</span><span class="kv-value mono" id="diNS">—</span></div>
                         <div class="kv"><span class="kv-label">Bản ghi TXT</span><span class="kv-value mono" id="diTXT">—</span></div>
+                        <div class="kv"><span class="kv-label">Bản ghi CNAME</span><span class="kv-value mono" id="diCname">—</span></div>
+                        <div class="kv"><span class="kv-label">SOA (nameserver chính)</span><span class="kv-value mono" id="diSoa">—</span></div>
+                        <div class="kv"><span class="kv-label">PTR (reverse DNS)</span><span class="kv-value mono" id="diPtr">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">SPF</span><span class="kv-value mono wrap" id="diSpf">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">DMARC</span><span class="kv-value mono wrap" id="diDmarc">—</span></div>
+                        <div class="kv"><span class="kv-label">DNSSEC</span><span class="kv-value" id="diDnssec">—</span></div>
                     </div>
                     <h3 class="subhead"><i data-lucide="file-text"></i> WHOIS</h3>
                     <div class="kv-grid">
@@ -136,6 +130,9 @@
                         <div class="kv"><span class="kv-label">Ngày hết hạn</span><span class="kv-value" id="diWhoisExpires">—</span></div>
                         <div class="kv"><span class="kv-label">Nhà đăng ký</span><span class="kv-value" id="diRegistrar">—</span></div>
                         <div class="kv"><span class="kv-label">Tuổi domain</span><span class="kv-value" id="diWhoisAge">—</span></div>
+                        <div class="kv"><span class="kv-label">Ngày cập nhật</span><span class="kv-value" id="diWhoisUpdated">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">Nameservers</span><span class="kv-value mono wrap" id="diWhoisNs">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">Trạng thái WHOIS</span><span class="kv-value mono wrap" id="diWhoisStatus">—</span></div>
                     </div>
                     <h3 class="subhead"><i data-lucide="lock"></i> Chứng chỉ TLS</h3>
                     <div class="kv-grid">
@@ -143,6 +140,10 @@
                         <div class="kv"><span class="kv-label">Cấp bởi</span><span class="kv-value" id="diTlsIssuer">—</span></div>
                         <div class="kv"><span class="kv-label">Hết hạn</span><span class="kv-value" id="diTlsExpires">—</span></div>
                         <div class="kv"><span class="kv-label">Còn lại</span><span class="kv-value" id="diTlsDays">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">SANs (tên khác trong chứng chỉ)</span><span class="kv-value mono wrap" id="diTlsSans">—</span></div>
+                        <div class="kv"><span class="kv-label">Thuật toán ký</span><span class="kv-value mono" id="diTlsSigAlg">—</span></div>
+                        <div class="kv"><span class="kv-label">Phiên bản TLS</span><span class="kv-value" id="diTlsVersion">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">Cipher đã thỏa thuận</span><span class="kv-value mono wrap" id="diTlsCipher">—</span></div>
                     </div>
                     <h3 class="subhead"><i data-lucide="wifi"></i> Truy cập HTTP(S)</h3>
                     <div class="kv-grid">
@@ -152,6 +153,11 @@
                         <div class="kv"><span class="kv-label">Thời gian phản hồi</span><span class="kv-value" id="diHttpTime">—</span></div>
                         <div class="kv kv-wide"><span class="kv-label">URL cuối cùng</span><span class="kv-value mono wrap" id="diHttpFinal">—</span></div>
                         <div class="kv kv-wide"><span class="kv-label">Chuỗi chuyển hướng</span><span class="kv-value mono wrap" id="diHttpRedirects">—</span></div>
+                        <div class="kv"><span class="kv-label">Loại nội dung</span><span class="kv-value mono" id="diHttpContentType">—</span></div>
+                        <div class="kv"><span class="kv-label">Dung lượng</span><span class="kv-value" id="diHttpContentLength">—</span></div>
+                        <div class="kv"><span class="kv-label">Số lần chuyển hướng</span><span class="kv-value" id="diHttpRedirectCount">—</span></div>
+                        <div class="kv"><span class="kv-label">IP đã phân giải</span><span class="kv-value mono" id="diHttpIp">—</span></div>
+                        <div class="kv kv-wide"><span class="kv-label">Vị trí / Nhà cung cấp (IP)</span><span class="kv-value wrap" id="diHttpIpInfo">—</span></div>
                     </div>
                 </div>
             </details>
@@ -177,7 +183,6 @@
     <footer class="footer">
         <div class="container footer-inner">
             <span>ScamShield-AI — Kết quả chỉ mang tính tham khảo.</span>
-            <button type="button" class="btn-ghost btn-small" id="apiSwitchBtn" title="Đổi máy chủ API">Đổi máy chủ API</button>
         </div>
     </footer>
 
