@@ -25,44 +25,51 @@ MODEL_DIR = os.path.join(BACKEND_DIR, "models")
 if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
 
 from features import (extract_features, registrable_domain, get_advanced_insights,
-                      load_tokenizer_json, texts_to_char_sequences, pad_post, FEATURE_NAMES)
+                      load_tokenizer_json, texts_to_char_sequences, pad_post, FEATURE_NAMES,
+                      skeletonize, f2_doc)
 from database import check_url_in_db
 from domain_info import get_domain_info, resolve_dns
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# Load Models (pipeline notebook dataset_url_05: NN -> XGBoost stack)
-# 5 artifacts trong backend/models: phishing_nn.keras, xgb_model.json,
-# tokenizer.json, scaler.pkl, meta.json
+# Load Models (pipeline notebook dataset_url_06 v8: NN -> XGBoost stack 170 cot)
+# 7 artifacts trong backend/models: phishing_nn.keras, xgb_model.json,
+# tokenizer.json, scaler.pkl, tfidf_f2.pkl, svd_f2.pkl, meta.json
 model_nn = None
 model_xgb = None
 tokenizer_index = None  # (word_index, oov_index)
 tokenizer_oov = None
 scaler = None
-META = {"threshold": 0.5, "max_len": 200, "trusted_domains": set(), "feature_names": FEATURE_NAMES}
+tfidf_f2 = None
+svd_f2 = None
+META = {"threshold": 0.45, "max_len": 200, "trusted_domains": set(), "feature_names": FEATURE_NAMES}
 
 
 def load_all_models():
-    global model_nn, model_xgb, tokenizer_index, tokenizer_oov, scaler, META
+    global model_nn, model_xgb, tokenizer_index, tokenizer_oov, scaler, META, tfidf_f2, svd_f2
     try:
         with open(os.path.join(MODEL_DIR, "meta.json"), encoding="utf-8") as f:
             meta = json.load(f)
         META = {
-            "threshold": float(meta.get("threshold", 0.5)),
+            "threshold": float(meta.get("threshold", 0.45)),
             "max_len": int(meta.get("max_len", 200)),
             "trusted_domains": set(meta.get("trusted_domains", [])),
             "feature_names": meta.get("feature_names", FEATURE_NAMES),
         }
-        if len(META["feature_names"]) != 18:
-            print(f"⚠️ Cảnh báo: meta.json có {len(META['feature_names'])} features, kỳ vọng 18")
+        if len(META["feature_names"]) != 41:
+            print(f"⚠️ Cảnh báo: meta.json có {len(META['feature_names'])} features, kỳ vọng 41")
         tokenizer_index, tokenizer_oov = load_tokenizer_json(os.path.join(MODEL_DIR, "tokenizer.json"))
         with open(os.path.join(MODEL_DIR, "scaler.pkl"), "rb") as f:
             scaler = pickle.load(f)
+        with open(os.path.join(MODEL_DIR, "tfidf_f2.pkl"), "rb") as f:
+            tfidf_f2 = pickle.load(f)
+        with open(os.path.join(MODEL_DIR, "svd_f2.pkl"), "rb") as f:
+            svd_f2 = pickle.load(f)
         model_xgb = xgb.XGBClassifier()
         model_xgb.load_model(os.path.join(MODEL_DIR, "xgb_model.json"))
         model_nn = load_model(os.path.join(MODEL_DIR, "phishing_nn.keras"))
-        print(f"✅ Đã nạp pipeline mới: NN + XGBoost, threshold={META['threshold']}, "
+        print(f"✅ Đã nạp pipeline v8: NN + XGBoost, threshold={META['threshold']}, "
               f"whitelist={len(META['trusted_domains'])} domains")
         return True
     except Exception as e:
@@ -76,7 +83,8 @@ load_all_models()
 @app.get("/health")
 async def health():
     """Kiểm tra nhanh service và trạng thái nạp model (dùng cho Render health check)."""
-    loaded = all(v is not None for v in [model_nn, model_xgb, tokenizer_index, scaler])
+    loaded = all(v is not None for v in [model_nn, model_xgb, tokenizer_index, scaler,
+                                         tfidf_f2, svd_f2])
     return {"status": "ok" if loaded else "degraded",
             "models_loaded": loaded,
             "threshold": META["threshold"]}
@@ -232,18 +240,22 @@ def check_google_safe_browsing(url: str):
 
 
 def predict_with_pipeline(url: str):
-    """Đúng logic predict_url của notebook: whitelist -> 18 features -> scaler
-    -> NN -> XGBoost stack -> ngưỡng trong meta.json. Trả về (status, prob, nn_prob)."""
+    """Đúng logic predict_url của notebook 08: whitelist -> 41 features ->
+    scaler -> NN [seq(skeletonize), scaled] -> F2(skeletonize) -> XGBoost
+    stack [nn_prob, 41 features, 128 F2] = 170 cột -> ngưỡng trong meta.json
+    (0.45). Trả về (status, prob, nn_prob)."""
     u = str(url).strip().lower()
     rd = registrable_domain(u)
     if rd in META["trusted_domains"]:  # whitelist: so sánh domain đăng ký, không dùng substring
         return "Safe", 0.0, 0.0, "whitelist"
+    skel = skeletonize(u)
     feats = np.array([extract_features(u)], dtype=np.float32)
     scaled = scaler.transform(feats)
-    seq = pad_post(texts_to_char_sequences([u], tokenizer_index, tokenizer_oov),
+    seq = pad_post(texts_to_char_sequences([skel], tokenizer_index, tokenizer_oov),
                    META["max_len"])
     nn_p = float(model_nn.predict([np.array(seq), scaled], verbose=0).ravel()[0])
-    stack = np.column_stack([[nn_p], scaled])  # [nn_prob, 18 features đã chuẩn hóa]
+    f2 = svd_f2.transform(tfidf_f2.transform([f2_doc(skel)])).astype(np.float32)
+    stack = np.column_stack([[nn_p], scaled, f2])  # [nn_prob, 41 features, 128 F2] = 170 cột
     p = float(model_xgb.predict_proba(stack)[0][1])
     status = "Phishing" if p >= META["threshold"] else "Safe"
     return status, p, nn_p, "ai_analysis"
@@ -334,8 +346,9 @@ async def predict(request: URLRequest):
     google_res = check_google_safe_browsing(processed_url)
     if google_res: return _attach_domain_info(google_res, info)
 
-    # 6. AI Analysis (pipeline mới)
-    if model_nn is None or model_xgb is None or tokenizer_index is None or scaler is None:
+    # 6. AI Analysis (pipeline v8)
+    if (model_nn is None or model_xgb is None or tokenizer_index is None or scaler is None
+            or tfidf_f2 is None or svd_f2 is None):
         raise HTTPException(status_code=503, detail="Models not loaded")
     try:
         status, prob, nn_prob, source = predict_with_pipeline(processed_url)
