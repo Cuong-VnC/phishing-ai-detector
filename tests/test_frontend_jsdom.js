@@ -10,6 +10,7 @@ const { JSDOM } = require("jsdom");
 const REPO = "/home/hatch/workspace/phishing-ai-detector/frontend";
 const html = fs.readFileSync(REPO + "/index.html", "utf8");
 const js = fs.readFileSync(REPO + "/script.js", "utf8");
+const css = fs.readFileSync(REPO + "/style.css", "utf8");
 
 const SAFE_PAYLOAD = {
   url: "https://www.google.com", status: "Safe", probability: 0.0,
@@ -86,6 +87,13 @@ function check(name, cond, extra = "") {
   await sleep(80);
   // 1. Khoi tao: health pill
   check("health pill hien API dang hoat dong", /hoạt động/i.test($("apiStatusText").textContent), $("apiStatusText").textContent.trim());
+  // 0. Giao dien moi: khong gradient, khong giai thich cong nghe
+  check("CSS khong con gradient", !/gradient/i.test(css));
+  const heroSub = window.document.querySelector(".hero-sub");
+  check("hero-sub ngan 1 dong, khong nhac ten cong nghe",
+    heroSub && heroSub.textContent.trim().length <= 60 && !/xgboost|mạng nơ-ron|học máy|mô hình ai|neural/i.test(heroSub.textContent),
+    heroSub ? heroSub.textContent.trim() : "thieu .hero-sub");
+  check("khong con muc 'hoat dong the nao'", !window.document.querySelector(".how-card"));
   // 2. Sample chip dien URL
   window.document.querySelector(".chip").click();
   check("chip mau dien URL vao input", $("urlInput").value.length > 0, $("urlInput").value);
