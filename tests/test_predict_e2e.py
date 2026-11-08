@@ -7,8 +7,11 @@ Ghi chú về sandbox:
   (1) socket.gethostbyname -> trả IP công khai giả theo host;
   (2) main.resolve_dns -> NXDOMAIN cho domain test không tồn tại,
   "resolved" cho các host còn lại.
-- Model thật (05) được nạp và chạy thật; HTTP/TLS qua proxy egress thật.
+- Model thật (08) được nạp và chạy thật; HTTP/TLS qua proxy egress thật.
 - WHOIS cổng 43 bị chặn -> kỳ vọng whois "unknown" trong domain_info.
+- Ngưỡng quyết định của model 08 là 0.45 (meta.json); các ca phishing
+  mới: drive-google-share.com (vòng 2 sai, vòng 3 đã sửa) và URL homoglyph
+  dạng punycode xn--vietcombank-9ya.com (Cyrillic 'а' trong vietcombank).
 """
 import json
 import socket
@@ -25,6 +28,8 @@ _FAKE_IPS = {
     "www.google.com": "142.250.80.4",
     "google.com": "142.250.80.4",
     "vietcombank-dangnhap.com": "45.60.11.10",
+    "drive-google-share.com": "104.21.33.15",
+    "xn--vietcombank-9ya.com": "103.86.120.20",
     "xkqjzwv-qqqq-zzz12345.com": None,  # -> gaierror (không dùng tới vì DNS check chặn trước)
 }
 
@@ -48,7 +53,8 @@ def _fake_resolve_dns(host, resolver=None):
             "dnssec": {"enabled": False, "ds": False, "dnskey": False}}
     if host == "xkqjzwv-qqqq-zzz12345.com":
         return "nxdomain", {"a": [], "aaaa": [], "mx": [], "ns": [], "txt": [], **base}
-    if host in ("www.google.com", "google.com", "vietcombank-dangnhap.com"):
+    if host in ("www.google.com", "google.com", "vietcombank-dangnhap.com",
+                "drive-google-share.com", "xn--vietcombank-9ya.com"):
         extra = dict(base)
         if host in ("www.google.com", "google.com"):
             extra.update({
@@ -86,6 +92,10 @@ def show(name, resp):
 r = client.get("/health")
 check("GET /health 200 + models_loaded", r.status_code == 200 and r.json().get("models_loaded") is True,
       str(r.json()))
+check("GET /health threshold 0.45 (model v8)",
+      isinstance(r.json().get("threshold"), (int, float))
+      and abs(r.json()["threshold"] - 0.45) < 1e-9,  # meta.json luu float(best_t)=0.45000000000000007
+      str(r.json().get("threshold")))
 
 # 1. URL legit (whitelist)
 r = client.post("/predict", json={"url": "https://www.google.com"})
@@ -135,6 +145,26 @@ check("phishing: status Phishing", b.get("status") == "Phishing", str(b.get("sta
 check("phishing: probability > 0.5", isinstance(b.get("probability"), (int, float)) and b["probability"] > 0.5,
       str(b.get("probability")))
 check("phishing: co domain_info", isinstance(b.get("domain_info"), dict))
+
+# 2b. URL phishing giả mạo Google Drive (vòng 2 sai: prob 0.4211 < ngưỡng 0.48;
+#     vòng 3 đã sửa -> phải là Phishing với ngưỡng 0.45)
+r = client.post("/predict", json={"url": "https://drive-google-share.com/"})
+show("phishing drive-google-share", r)
+b = r.json() if r.status_code == 200 else {}
+check("drive-share: HTTP 200", r.status_code == 200, str(r.status_code))
+check("drive-share: status Phishing", b.get("status") == "Phishing", str(b.get("status")))
+check("drive-share: probability >= 0.45", isinstance(b.get("probability"), (int, float))
+      and b["probability"] >= 0.45, str(b.get("probability")))
+
+# 2c. URL homoglyph dạng punycode: xn--vietcombank-9ya.com
+#     ('vietcombаnk' với 'а' Cyrillic U+0430) -> skeleton_brand_match = 1
+r = client.post("/predict", json={"url": "https://xn--vietcombank-9ya.com/login"})
+show("phishing homoglyph punycode", r)
+b = r.json() if r.status_code == 200 else {}
+check("homoglyph: HTTP 200", r.status_code == 200, str(r.status_code))
+check("homoglyph: status Phishing", b.get("status") == "Phishing", str(b.get("status")))
+check("homoglyph: probability >= 0.45", isinstance(b.get("probability"), (int, float))
+      and b["probability"] >= 0.45, str(b.get("probability")))
 
 # 3. Ten mien KHONG ton tai
 r = client.post("/predict", json={"url": "https://xkqjzwv-qqqq-zzz12345.com/login"})
