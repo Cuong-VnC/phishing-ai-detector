@@ -44,10 +44,21 @@ _REAL_RESOLVE_DNS = app_main.resolve_dns
 
 
 def _fake_resolve_dns(host, resolver=None):
+    base = {"cname": [], "soa": None, "ptr": [], "spf": None, "dmarc": None,
+            "dnssec": {"enabled": False, "ds": False, "dnskey": False}}
     if host == "xkqjzwv-qqqq-zzz12345.com":
-        return "nxdomain", {"a": [], "aaaa": [], "mx": [], "ns": [], "txt": []}
+        return "nxdomain", {"a": [], "aaaa": [], "mx": [], "ns": [], "txt": [], **base}
     if host in ("www.google.com", "google.com", "vietcombank-dangnhap.com"):
-        return "resolved", {"a": [_FAKE_IPS[host]], "aaaa": [], "mx": [], "ns": [], "txt": []}
+        extra = dict(base)
+        if host in ("www.google.com", "google.com"):
+            extra.update({
+                "soa": {"primary_ns": "ns1.google.com", "serial": "123456",
+                        "raw": "ns1.google.com. dns-admin.google.com. 123456 900 900 1800 60"},
+                "ptr": ["fra24s12-in-f4.1e100.net"], "spf": "v=spf1 -all",
+                "dmarc": {"record": "v=DMARC1; p=reject", "policy": "reject"},
+                "dnssec": {"enabled": True, "ds": True, "dnskey": True},
+            })
+        return "resolved", {"a": [_FAKE_IPS[host]], "aaaa": [], "mx": [], "ns": [], "txt": [], **extra}
     return _REAL_RESOLVE_DNS(host, resolver=resolver)
 
 
@@ -92,6 +103,28 @@ check("legit: domain_status active", b.get("domain_status") == "active", str(b.g
 check("legit: http reachable trong domain_info",
       (b.get("domain_info") or {}).get("http", {}).get("reachable") is True)
 check("legit: warning null", b.get("warning") is None)
+check("legit: dns co truong moi (cname/soa/ptr/spf/dmarc/dnssec)",
+      set((b.get("domain_info") or {}).get("dns", {})) >= {"cname", "soa", "ptr", "spf", "dmarc", "dnssec"},
+      str(list((b.get("domain_info") or {}).get("dns", {}).keys())))
+check("legit: dns SOA/DMARC/SPF co gia tri that",
+      ((b.get("domain_info") or {}).get("dns", {}).get("soa") or {}).get("primary_ns") == "ns1.google.com"
+      and ((b.get("domain_info") or {}).get("dns", {}).get("dmarc") or {}).get("policy") == "reject"
+      and (b.get("domain_info") or {}).get("dns", {}).get("spf") == "v=spf1 -all")
+check("legit: whois co truong moi (updated/name_servers/domain_status)",
+      set((b.get("domain_info") or {}).get("whois", {})) >= {"updated", "name_servers", "domain_status"})
+check("legit: tls co truong moi (sans/sig_alg/tls_version/cipher/cipher_bits)",
+      set((b.get("domain_info") or {}).get("tls", {})) >= {"sans", "sig_alg", "tls_version", "cipher", "cipher_bits"})
+check("legit: http co truong moi (content_type/content_length/redirect_count/resolved_ip/ip_info)",
+      set((b.get("domain_info") or {}).get("http", {})) >= {"content_type", "content_length", "redirect_count", "resolved_ip", "ip_info"})
+check("legit: http resolved_ip = A record",
+      (b.get("domain_info") or {}).get("http", {}).get("resolved_ip") == "142.250.80.4",
+      str((b.get("domain_info") or {}).get("http", {}).get("resolved_ip")))
+check("legit: http redirect_count 0",
+      (b.get("domain_info") or {}).get("http", {}).get("redirect_count") == 0,
+      str((b.get("domain_info") or {}).get("http", {}).get("redirect_count")))
+check("legit: http ip_info dict hoac None (fail-soft)",
+      (b.get("domain_info") or {}).get("http", {}).get("ip_info") is None
+      or isinstance((b.get("domain_info") or {}).get("http", {}).get("ip_info"), dict))
 
 # 2. URL phishing trong benchmark
 r = client.post("/predict", json={"url": "https://vietcombank-dangnhap.com/login"})
