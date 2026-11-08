@@ -27,6 +27,7 @@ if SRC_DIR not in sys.path: sys.path.insert(0, SRC_DIR)
 from features import (extract_features, registrable_domain, get_advanced_insights,
                       load_tokenizer_json, texts_to_char_sequences, pad_post, FEATURE_NAMES)
 from database import check_url_in_db
+from domain_info import get_domain_info, resolve_dns
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -92,6 +93,73 @@ def is_safe_url(url: str) -> bool:
         ip_obj = ipaddress.ip_address(ip)
         return not (ip_obj.is_loopback or ip_obj.is_private or ip_obj.is_link_local)
     except: return False
+
+
+# --- ✅ VALIDATION ĐỊNH DẠNG URL (lỗi nhập liệu rõ ràng, riêng với lỗi SSRF) ---
+def validate_url_format(url: str):
+    """Trả (True, '') nếu định dạng OK, ngược lại (False, lý do tiếng Việt)."""
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False, "không phân tích được URL"
+    if parsed.scheme not in ("http", "https"):
+        return False, "URL phải bắt đầu bằng http:// hoặc https://"
+    host = parsed.hostname
+    if not host:
+        return False, "thiếu tên miền (hostname)"
+    if len(host) > 253 or any(len(p) > 63 for p in host.split(".")):
+        return False, "tên miền quá dài"
+    if not re.fullmatch(r"[A-Za-z0-9._\-:\[\]]+", host):
+        return False, "tên miền chứa ký tự không hợp lệ"
+    if "." not in host and not re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host) and ":" not in host:
+        return False, "tên miền thiếu phần mở rộng (ví dụ: .com, .vn)"
+    try:
+        port = parsed.port
+    except ValueError:
+        return False, "cổng (port) không hợp lệ"
+    if port is not None and not (1 <= port <= 65535):
+        return False, "cổng (port) ngoài khoảng 1-65535"
+    return True, ""
+
+
+def _attach_domain_info(resp: dict, info: dict):
+    """Thêm domain_info / domain_status / warning vào response, giữ nguyên
+    mọi trường cũ (frontend cũ và deployment hiện tại không vỡ)."""
+    resp["domain_info"] = info
+    resp["domain_status"] = info.get("status", "unknown")
+    resp["warning"] = None
+    if info.get("status") == "inactive":
+        if (info.get("dns") or {}).get("status") == "no_answer":
+            resp["warning"] = (
+                "Tên miền tồn tại nhưng không có bản ghi DNS trỏ tới máy chủ web "
+                "(không có A/AAAA) — tên miền có thể đã ngừng hoạt động."
+            )
+        else:
+            resp["warning"] = (
+                "Tên miền phân giải được DNS nhưng không phản hồi HTTP(S) — "
+                "tên miền có thể đã ngừng hoạt động hoặc đang chặn truy cập."
+            )
+    elif info.get("status") == "unknown":
+        resp["warning"] = (
+            "Không kiểm tra được trạng thái hoạt động của tên miền "
+            "(DNS/HTTP không phản hồi) — kết quả AI vẫn được hiển thị."
+        )
+    return resp
+
+
+@app.get("/domain-info")
+async def domain_info_endpoint(url: str = ""):
+    """Kiểm tra chi tiết tên miền: DNS / WHOIS / TLS / HTTP (fail-soft)."""
+    raw = (url or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Thiếu tham số url")
+    processed = raw.lower() if raw.startswith("http") else "http://" + raw.lower()
+    ok, reason = validate_url_format(processed)
+    if not ok:
+        raise HTTPException(status_code=400, detail=f"URL không đúng định dạng: {reason}")
+    if not is_safe_url(processed):
+        raise HTTPException(status_code=400, detail="URL blocked for security reasons")
+    return {"url": raw, "domain_info": get_domain_info(processed)}
 
 
 class URLRequest(BaseModel):
@@ -212,33 +280,68 @@ async def predict(request: URLRequest):
     raw_url = request.url
     processed_url = raw_url.lower() if raw_url.startswith("http") else "http://" + raw_url.lower()
 
+    # 0. Định dạng URL (lỗi nhập liệu -> 400 với lý do rõ ràng)
+    ok, reason = validate_url_format(processed_url)
+    if not ok:
+        raise HTTPException(status_code=400, detail=f"URL không đúng định dạng: {reason}")
+
+    # 1. DB Nội bộ (đã chuẩn hóa về shape chuẩn; shape lạ thì bỏ qua).
+    #    Tra DB trước DNS: URL đã biết là phishing thì vẫn báo phishing
+    #    dù tên miền đã chết.
+    db_record = check_url_in_db(raw_url)
+    if db_record:
+        normalized = normalize_db_record(db_record, raw_url)
+        if normalized:
+            info = get_domain_info(processed_url)
+            return _attach_domain_info(normalized, info)
+
+    # 2. Tên miền có tồn tại không (DNS NXDOMAIN -> dừng sớm, không chạy model).
+    host = urlparse(processed_url).hostname or ""
+    dns_status, dns_records = resolve_dns(host)
+    if dns_status == "nxdomain":
+        info = get_domain_info(processed_url, dns_result=(dns_status, dns_records))
+        age = info.get("whois", {}).get("age_days")
+        return {
+            "url": raw_url, "status": "DomainNotFound", "probability": None,
+            "risk_level": "Unknown",
+            "technical_report": {
+                "domain_age": age if age is not None else "N/A",
+                "dns_status": "No DNS record",
+                "impersonation_risk": "Unknown",
+                "is_shortened": False,
+            },
+            "domain_info": info, "domain_status": "nonexistent", "warning": None,
+            "message": (f"Tên miền {info.get('domain') or host} không tồn tại "
+                        "(DNS không phân giải được) — không thể truy cập."),
+            "source": "domain_check",
+        }
+
     if not is_safe_url(processed_url):
         # Lỗi phải trả HTTP status thật, không trả 200 kèm {"status": "Error"}
         # vì FE đọc response.ok sẽ tưởng là kết quả hợp lệ.
         raise HTTPException(status_code=400, detail="URL blocked for security reasons")
 
-    # 1. DB Nội bộ (đã chuẩn hóa về shape chuẩn; shape lạ thì bỏ qua)
-    db_record = check_url_in_db(raw_url)
-    if db_record:
-        normalized = normalize_db_record(db_record, raw_url)
-        if normalized: return normalized
+    # 3. Thông tin tên miền chi tiết (DNS/WHOIS/TLS/HTTP, fail-soft) — dùng
+    #    chung cho mọi response bên dưới; đồng thời cho biết tên miền có đang
+    #    hoạt động không (warning nếu inactive).
+    info = get_domain_info(processed_url, dns_result=(dns_status, dns_records))
 
-    # 2. URLhaus API (Chuyên dụng với Auth-Key)
+    # 4. URLhaus API (Chuyên dụng với Auth-Key)
     urlhaus_res = check_urlhaus(processed_url)
-    if urlhaus_res: return urlhaus_res
+    if urlhaus_res: return _attach_domain_info(urlhaus_res, info)
 
-    # 3. Google Safe Browsing
+    # 5. Google Safe Browsing
     google_res = check_google_safe_browsing(processed_url)
-    if google_res: return google_res
+    if google_res: return _attach_domain_info(google_res, info)
 
-    # 4. AI Analysis (pipeline mới)
+    # 6. AI Analysis (pipeline mới)
     if model_nn is None or model_xgb is None or tokenizer_index is None or scaler is None:
         raise HTTPException(status_code=503, detail="Models not loaded")
     try:
         status, prob, nn_prob, source = predict_with_pipeline(processed_url)
 
         if source == "whitelist":
-            return {
+            return _attach_domain_info({
                 "url": raw_url, "status": status, "probability": 0.0, "risk_level": "Low",
                 "technical_report": {
                     "domain_age": "N/A",
@@ -247,12 +350,12 @@ async def predict(request: URLRequest):
                     "is_shortened": False
                 },
                 "source": "whitelist"
-            }
+            }, info)
 
         adv = get_advanced_insights(processed_url)
         risk = "High" if prob >= 0.7 else ("Medium" if prob >= 0.4 else "Low")
 
-        return {
+        return _attach_domain_info({
             "url": raw_url, "status": status, "probability": round(prob, 4), "risk_level": risk,
             "technical_report": {
                 "domain_age": adv.get('domain_age_days', "N/A"),
@@ -262,7 +365,7 @@ async def predict(request: URLRequest):
                 "nn_probability": round(nn_prob, 4)
             },
             "source": "ai_analysis"
-        }
+        }, info)
     except HTTPException:
         raise
     except Exception as e:
